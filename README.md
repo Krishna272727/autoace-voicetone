@@ -8,6 +8,14 @@ Drop in individual files or a ZIP; nested folders are searched. Results are
 sortable, every clip can be played back in the browser to check a prediction by
 ear, and the whole batch downloads as CSV or JSON.
 
+**Start with [`MEMO.md`](MEMO.md)** — the technical memo. Architecture and why
+it is shaped that way, the approaches compared and the ones rejected with the
+measurements that killed them, validation with per-field accuracy and confusion
+matrices, the cost model, the latency table, failure modes, and scale limits.
+
+[`predictions.csv`](predictions.csv) holds the outputs for the three provided
+calls, in the supplied schema.
+
 ## What comes back
 
 ```json
@@ -24,19 +32,18 @@ ear, and the whole batch downloads as CSV or JSON.
 }
 ```
 
+**83.3% mean field accuracy** on the three provided calls, against a 45.8%
+majority-class baseline. All inference runs in the deployment itself; no
+third-party AI API is called and none is billed.
 
-Predictions for the three provided calls are in `predictions.csv`,
-in the schema AutoAce supplied. (`Output format.csv` is AutoAce's own
-template, kept for reference.)
-
-## Reading further
+## The rest
 
 | | |
 |---|---|
-| `MEMO.md` | architecture, approaches compared, validation, cost, latency, failure modes |
-| `EXPERIMENTS.md` | run-by-run log — what was tried, what it scored, what was rejected |
-| `LICENCES.md` | every model, its licence, and what was rejected on licence grounds |
-| `DEPLOY.md` | how it is hosted, and why the obvious cheaper options do not work |
+| [`EXPERIMENTS.md`](EXPERIMENTS.md) | run-by-run log: what was tried, what it scored, what was rejected |
+| [`LICENCES.md`](LICENCES.md) | every model, its licence, and what was rejected on licence grounds |
+| [`DEPLOY.md`](DEPLOY.md) | how it is hosted, and why the obvious cheaper options do not work |
 
-Comments in the code carry the reasoning for anything non-obvious, including
-the measurements behind decisions that went the other way.
+The provided call recordings are deliberately not in this repository. Comments
+in the code carry the reasoning for anything non-obvious, including the
+measurements behind decisions that went the other way.
