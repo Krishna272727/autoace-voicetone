@@ -28,3 +28,8 @@ results/
 # Internal build specification. Referenced by section number throughout the
 # code; kept out of the shared repo by choice.
 BUILD_SPEC.md
+
+# AutoAce's own material, not ours to publish: three real customer call
+# recordings and their brief. Kept locally, never committed.
+samples/
+docs/
