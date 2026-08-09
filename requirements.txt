@@ -1,0 +1,27 @@
+# AutoAce Voice Tone -- pinned dependency set (BUILD_SPEC.md 4.2)
+numpy>=1.24,<3
+scipy>=1.11
+soundfile>=0.12
+librosa>=0.10
+pydantic>=2.5
+python-multipart>=0.0.9
+fastapi>=0.110
+uvicorn[standard]>=0.29
+jinja2>=3.1
+torch>=2.2                 # CPU build; see README for the cpu index-url
+torchaudio>=2.2
+onnxruntime>=1.17          # Silero VAD
+faster-whisper>=1.0        # CTranslate2 ASR
+transformers>=4.40         # SER + AudioSet tagger + text sentiment
+huggingface-hub>=0.23
+scikit-learn>=1.4
+lightgbm>=4.3              # optional; only if a learned fusion beats rules
+pytest>=8.0
+
+# Added beyond 4.2, both already transitive deps of huggingface-hub/uvicorn:
+PyYAML>=6.0                # config/thresholds.yaml
+
+# Optional: overlap detection via VOICETONE_OVERLAP=pyannote. Not installed by
+# default -- it was measured (MEMO.md 8) and did not beat abstention at ~3x the
+# runtime, and it pulls lightning, speechbrain and asteroid-filterbanks.
+# pyannote.audio>=4.0

@@ -1,0 +1,30 @@
+# Environment
+.venv/
+venv/
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+
+# Model weights: ~2 GB, fetched by scripts/download_models.py
+.hf_cache/
+
+# Generated. `scripts/make_synthetic.py` rebuilds the corpus; `cli.py` rebuilds
+# the results. Neither belongs in history.
+synthetic/
+results/
+
+# Editor and tooling local state
+.DS_Store
+.claude/
+.vscode/*
+!.vscode/settings.json
+!.vscode/launch.json
+
+# Internal build specification. Referenced by section number throughout the
+# code; kept out of the shared repo by choice.
+BUILD_SPEC.md

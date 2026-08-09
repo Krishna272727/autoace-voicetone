@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>{% block title %}AutoAce · Voice Intelligence{% endblock %}</title>
+<link rel="icon" href="data:image/svg+xml,{% filter urlencode %}<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="%232563EB"/><path d="M9 21l4.4-11h2.6L20.4 21h-2.5l-1-2.7h-4.5L11.4 21H9zm4.1-4.6h3.1l-1.55-4.3-1.55 4.3z" fill="white"/></svg>{% endfilter %}">
+<style>
+/* ==========================================================================
+   AutoAce design tokens.
+
+   Type and palette follow the arrowhead.ai reference: Quicksand throughout,
+   a near-black ground (#02060D) and a vivid violet accent (#8B0FFF) with a
+   blue secondary (#6AA5FF).
+
+   Quicksand is served from /static, not from Google Fonts: this runs in a
+   container with no outbound network access, so a CDN webfont would silently
+   fail and drop the whole page back to a system face at a different scale.
+   One variable file covers 300-700. OFL-1.1, so bundling is permitted.
+   ========================================================================== */
+@font-face {
+  font-family: "Quicksand";
+  src: url("/static/fonts/quicksand-latin.woff2") format("woff2");
+  font-weight: 300 700; font-style: normal; font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
+                 U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F,
+                 U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF,
+                 U+FFFD;
+}
+@font-face {
+  font-family: "Quicksand";
+  src: url("/static/fonts/quicksand-latin-ext.woff2") format("woff2");
+  font-weight: 300 700; font-style: normal; font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7,
+                 U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF,
+                 U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0,
+                 U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+:root {
+  color-scheme: light;
+
+  --brand:          #7A0BE0;
+  --brand-dark:     #5E08AD;
+  --brand-light:    #8B0FFF;
+  --brand-tint:     #F5EDFF;
+  --brand-ring:     rgba(139, 15, 255, 0.18);
+  --accent-blue:    #076AFF;
+
+  --ink:            #0F172A;
+  --ink-2:          #374151;
+  --ink-3:          #6B7280;
+  --ink-4:          #9CA3AF;
+
+  --bg:             #F8FAFC;
+  --surface:        #FFFFFF;
+  --surface-2:      #F9FAFB;
+  --line:           #E5E7EB;
+  --line-2:         #D1D5DB;
+
+  /* Status palette: fixed, never themed, never reused as a series color.
+     Always paired with a text label -- warning and serious are below 3:1 on a
+     light surface by design, so hue never carries meaning alone. */
+  --good:           #0CA30C;
+  --warning:        #FAB219;
+  --serious:        #EC835A;
+  --critical:       #D03B3B;
+
+  --radius:         14px;
+  --radius-sm:      10px;
+  --radius-lg:      18px;
+  --shadow-sm:      0 1px 2px rgba(15, 23, 42, 0.06),
+                    0 1px 3px rgba(15, 23, 42, 0.04);
+  --shadow:         0 4px 6px -1px rgba(15, 23, 42, 0.07),
+                    0 2px 4px -2px rgba(15, 23, 42, 0.05);
+  --shadow-lg:      0 20px 25px -5px rgba(15, 23, 42, 0.10),
+                    0 8px 10px -6px rgba(15, 23, 42, 0.05);
+
+  --sans: "Quicksand", ui-rounded, "SF Pro Rounded", -apple-system,
+          "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+          "Liberation Mono", monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --brand:       #8B0FFF;
+    --brand-dark:  #7A0BE0;
+    --brand-light: #C280FF;
+    --brand-tint:  rgba(139, 15, 255, 0.14);
+    --brand-ring:  rgba(139, 15, 255, 0.32);
+    --accent-blue: #6AA5FF;
+    --ink:         #EBEBEB;
+    --ink-2:       #C7C9D4;
+    --ink-3:       #A0A3BD;
+    --ink-4:       #707070;
+    --bg:          #02060D;
+    --surface:     #080D18;
+    --surface-2:   #0E1524;
+    --line:        #1A2233;
+    --line-2:      #262F42;
+    --good:        #22C55E;
+    --shadow-sm:   0 1px 2px rgba(0,0,0,0.4);
+    --shadow:      0 4px 6px -1px rgba(0,0,0,0.5);
+    --shadow-lg:   0 20px 25px -5px rgba(0,0,0,0.6);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --brand: #8B0FFF; --brand-dark: #7A0BE0; --brand-light: #C280FF;
+  --brand-tint: rgba(139,15,255,0.14); --brand-ring: rgba(139,15,255,0.32);
+  --accent-blue: #6AA5FF;
+  --ink: #EBEBEB; --ink-2: #C7C9D4; --ink-3: #A0A3BD; --ink-4: #707070;
+  --bg: #02060D; --surface: #080D18; --surface-2: #0E1524;
+  --line: #1A2233; --line-2: #262F42; --good: #22C55E;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
+  --shadow: 0 4px 6px -1px rgba(0,0,0,0.5);
+  --shadow-lg: 0 20px 25px -5px rgba(0,0,0,0.6);
+}
+
+* { box-sizing: border-box; }
+html { height: 100%; }
+body {
+  margin: 0;
+  /* Column flex + `main { flex: 1 }` pins the footer to the bottom of the
+     viewport on short pages. Without it the footer stopped wherever the
+     content did, leaving a bare rule floating over half a screen of dead
+     space on /history and on any single-file result page. */
+  min-height: 100%; display: flex; flex-direction: column;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  background: var(--bg);
+}
+/* Violet beam sweeping from the top right, on the near-black ground.
+   A fixed-position layer, NOT `background-attachment: fixed` on the body: that
+   makes the browser repaint three radial gradients on every scroll frame,
+   which is one of the few reliable ways to make a static page stutter. A fixed
+   element gets its own composited layer and is simply re-used. */
+body::after {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(48% 38% at 88% -8%, color-mix(in srgb, var(--brand) 34%, transparent), transparent 68%),
+    radial-gradient(38% 46% at 100% 12%, color-mix(in srgb, var(--accent-blue) 20%, transparent), transparent 70%),
+    radial-gradient(60% 45% at 4% -6%, color-mix(in srgb, var(--brand) 12%, transparent), transparent 72%);
+}
+/* The dot grid sits in its own layer so it can be masked independently of
+   the beams below it. */
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image: radial-gradient(circle at 1px 1px,
+                    color-mix(in srgb, var(--ink) 22%, transparent) 1px, transparent 0);
+  background-size: 26px 26px;
+  opacity: .28;
+  -webkit-mask-image: radial-gradient(90% 60% at 70% 0%, #000 0%, transparent 78%);
+          mask-image: radial-gradient(90% 60% at 70% 0%, #000 0%, transparent 78%);
+}
+
+/* --- brand lockup ------------------------------------------------------- */
+.logo { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
+.logo-mark {
+  width: 32px; height: 32px; border-radius: 10px; flex: none;
+  background: linear-gradient(150deg, var(--brand-light), var(--brand-dark) 70%);
+  display: grid; place-items: center; color: #fff;
+  font-weight: 700; font-size: 15px; letter-spacing: -0.03em;
+  box-shadow: 0 2px 8px var(--brand-ring);
+}
+.logo-word { font-weight: 650; font-size: 17px; letter-spacing: -0.025em; color: var(--ink); }
+.logo-word b { font-weight: 750; }
+
+/* --- app shell ---------------------------------------------------------- */
+.topbar {
+  position: sticky; top: 0; z-index: 20;
+  padding: 14px 24px 0;
+}
+.topbar-inner {
+  max-width: 1240px; margin: 0 auto; padding: 10px 12px 10px 18px;
+  display: flex; align-items: center; gap: 16px;
+  /* A floating rounded bar rather than a full-width band, so the beam behind
+     it stays visible at the edges. */
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, .35);
+}
+.spacer { flex: 1; }
+.nav { display: flex; gap: 4px; margin-left: 10px; }
+.nav a {
+  font-size: 13.5px; font-weight: 540; color: var(--ink-3); text-decoration: none;
+  padding: 6px 11px; border-radius: 7px; transition: background .12s, color .12s;
+}
+.nav a:hover { color: var(--ink); background: var(--surface-2); }
+.who { font-size: 13px; color: var(--ink-3); display: flex; align-items: center; gap: 8px; }
+.avatar {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--brand-tint); color: var(--brand);
+  display: grid; place-items: center; font-size: 11px; font-weight: 700;
+  border: 1px solid var(--brand-ring);
+}
+main { width: 100%; max-width: 1240px; margin: 0 auto; padding: 30px 24px 64px;
+       flex: 1 0 auto;                     /* pushes the footer down */
+       position: relative; z-index: 1; }   /* above the dot grid */
+
+/* On a phone the bar drops the things you can do without -- the tagline, the
+   signed-in name -- and keeps the things you navigate with. An earlier version
+   hid .nav instead, which left History unreachable on a phone entirely. */
+@media (max-width: 760px) {
+  .topbar { padding: 10px 12px 0; }
+  .topbar-inner { padding: 8px 8px 8px 12px; gap: 8px; }
+  .nav { margin-left: 2px; }
+  .nav a { padding: 6px 8px; }
+  .who span:not(.avatar) { display: none; }
+  main { padding: 22px 16px 48px; }
+  .card { padding: 18px; }
+  h1 { font-size: 22px; }
+  .hero h1 { font-size: 27px !important; }
+}
+@media (max-width: 440px) {
+  .logo-word { font-size: 15px; }
+  .who { display: none; }
+}
+
+/* --- typography --------------------------------------------------------- */
+h1 { font-size: 26px; font-weight: 680; letter-spacing: -0.03em; margin: 0 0 6px; }
+h2 { font-size: 13px; font-weight: 650; letter-spacing: 0.04em; text-transform: uppercase;
+     color: var(--ink-3); margin: 0 0 16px; }
+.lede { color: var(--ink-3); font-size: 15px; margin: 0 0 28px; max-width: 62ch; }
+.mono, code, pre { font-family: var(--mono); font-variant-ligatures: none; }
+pre { font-size: 12.5px; margin: 0; overflow-x: auto; }
+
+/* --- surfaces ----------------------------------------------------------- */
+.card {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-sm);
+  padding: 24px; margin-bottom: 20px;
+}
+.card.flush { padding: 0; overflow: hidden; }
+.card-head {
+  padding: 18px 24px; border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 12px;
+}
+.card-head h2 { margin: 0; }
+
+/* --- KPI row ------------------------------------------------------------
+   Hero numbers, not charts: four scalars with no shape to plot. Value in ink,
+   label muted, a status dot where the number has a state. */
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(158px, 1fr)); gap: 14px; margin-bottom: 20px; }
+.kpi {
+  --accent: var(--brand);
+  position: relative; overflow: hidden;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--accent) 7%, transparent), transparent 55%),
+    var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 17px 18px 15px;
+  transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease;
+}
+/* A 2px hairline in the metric's own hue: the tile carries its status without
+   tinting the number itself, which stays in ink. */
+.kpi::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 2px;
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 25%, transparent));
+}
+.kpi:hover { transform: translateY(-2px); box-shadow: var(--shadow);
+             border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
+.kpi.is-good     { --accent: var(--good); }
+.kpi.is-critical { --accent: var(--critical); }
+.kpi.is-neutral  { --accent: var(--ink-4); }
+.kpi.is-accuracy { --accent: var(--accent-blue); }
+.kpi-label {
+  font-size: 11px; font-weight: 620; letter-spacing: 0.07em; text-transform: uppercase;
+  color: var(--ink-4); margin-bottom: 7px; display: flex; align-items: center; gap: 6px;
+}
+.kpi-value { font-size: 30px; font-weight: 670; letter-spacing: -0.04em; line-height: 1.05;
+             color: var(--ink); font-variant-numeric: tabular-nums; }
+.kpi-value small { font-size: 14px; font-weight: 550; color: var(--ink-4); letter-spacing: 0; }
+.kpi-note { font-size: 11.5px; color: var(--ink-4); margin-top: 5px; }
+
+/* --- status: a dot carries state, the label always carries the meaning --- */
+.dot { width: 7px; height: 7px; border-radius: 50%; flex: none; display: inline-block; }
+.dot.good { background: var(--good); }
+.dot.warning { background: var(--warning); }
+.dot.serious { background: var(--serious); }
+.dot.critical { background: var(--critical); }
+.dot.idle { background: var(--ink-4); }
+.state { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+.state-ok { color: var(--ink-2); }
+.state-bad { color: var(--critical); font-weight: 550; }
+
+/* --- buttons ------------------------------------------------------------ */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  font: inherit; font-weight: 580; font-size: 14px;
+  padding: 10px 18px; border-radius: var(--radius-sm);
+  border: 1px solid transparent; background: var(--brand); color: #fff;
+  cursor: pointer; text-decoration: none; transition: background .15s, box-shadow .15s, transform .05s;
+  box-shadow: 0 1px 2px var(--brand-ring);
+}
+.btn:hover { background: var(--brand-dark); }
+.btn:active { transform: translateY(1px); }
+.btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--brand-ring); }
+.btn:disabled { opacity: .55; cursor: default; transform: none; }
+.btn.ghost {
+  background: var(--surface); color: var(--ink-2); border-color: var(--line-2); box-shadow: none;
+}
+.btn.ghost:hover { background: var(--surface-2); color: var(--ink); }
+.btn.sm { padding: 7px 13px; font-size: 13px; }
+
+/* --- forms -------------------------------------------------------------- */
+label.field { display: block; margin-bottom: 16px; }
+label.field span {
+  display: block; font-size: 13px; font-weight: 580; color: var(--ink-2); margin-bottom: 6px;
+}
+input[type=text], input[type=password] {
+  width: 100%; font: inherit; font-size: 15px; padding: 11px 13px;
+  border: 1px solid var(--line-2); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--ink); transition: border-color .15s, box-shadow .15s;
+}
+input:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-ring); }
+
+/* --- notices ------------------------------------------------------------ */
+.notice {
+  display: flex; gap: 11px; align-items: flex-start;
+  border-radius: var(--radius-sm); padding: 13px 15px; font-size: 13.5px;
+  margin-bottom: 18px; border: 1px solid;
+}
+.notice .dot { margin-top: 7px; }
+.notice.warn { background: color-mix(in srgb, var(--warning) 10%, var(--surface));
+               border-color: color-mix(in srgb, var(--warning) 42%, transparent); color: var(--ink-2); }
+.notice.bad  { background: color-mix(in srgb, var(--critical) 8%, var(--surface));
+               border-color: color-mix(in srgb, var(--critical) 40%, transparent); color: var(--ink-2); }
+.notice.info { background: var(--brand-tint);
+               border-color: var(--brand-ring); color: var(--ink-2); }
+.notice b { color: var(--ink); }
+
+/* --- table --------------------------------------------------------------
+   Headers are sentence case, not uppercase: they carry full phrases ("What
+   the noise was") rather than one-word abbreviations, and long uppercase
+   strings are markedly harder to read. They wrap to two lines instead. */
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+thead th {
+  position: sticky; top: 0; background: var(--surface-2); z-index: 1;
+  text-align: left; padding: 11px 14px; vertical-align: bottom;
+  white-space: normal; max-width: 124px; line-height: 1.3;
+  font-size: 11.5px; font-weight: 600; letter-spacing: 0.01em;
+  color: var(--ink-3); border-bottom: 1px solid var(--line); cursor: pointer; user-select: none;
+}
+thead th:hover { color: var(--ink); }
+thead th::after { content: ""; opacity: .45; margin-left: 5px; }
+thead th[data-dir=asc]::after  { content: "▲"; font-size: 8px; }
+thead th[data-dir=desc]::after { content: "▼"; font-size: 8px; }
+tbody td { padding: 10px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; color: var(--ink-2); }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover td { background: var(--surface-2); }
+td.name { font-weight: 560; color: var(--ink); max-width: 260px; overflow: hidden;
+          text-overflow: ellipsis; }
+td.num { font-family: var(--mono); font-size: 12.5px; }
+
+/* --- value tags ---------------------------------------------------------
+   Every categorical result reads as a tag. The word is always present and
+   sits in ink; the tint and the dot are a second, redundant encoding of the
+   same ordinal rank, so nothing is carried by colour alone. */
+.tag {
+  display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
+  padding: 3px 11px 3px 9px; border-radius: 99px;
+  font-size: 12.5px; font-weight: 560; color: var(--ink);
+  background: color-mix(in srgb, var(--tone) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tone) 32%, transparent);
+}
+.tag::before {
+  content: ""; width: 6px; height: 6px; border-radius: 50%; flex: none;
+  background: var(--tone);
+}
+.tag.t-good    { --tone: var(--good); }
+.tag.t-warn    { --tone: var(--warning); }
+.tag.t-serious { --tone: var(--serious); }
+.tag.t-bad     { --tone: var(--critical); }
+.tag.t-info    { --tone: var(--accent-blue); }
+.tag.t-idle    { --tone: var(--ink-4); }
+/* The absence of a thing is not a status. No dot, no tint -- it should read
+   as quieter than every row that does have something to report. */
+.tag.plain {
+  background: transparent; border-color: var(--line-2); color: var(--ink-3);
+  padding-left: 11px; font-weight: 520;
+}
+.tag.plain::before { display: none; }
+
+/* Ordinal magnitudes (how strongly, how loud) get a three-step meter rather
+   than a hue, because they rank rather than classify. */
+.tag.lvl::before { display: none; }
+.tag.lvl { padding-left: 10px; }
+.bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 11px; flex: none; }
+.bars i { width: 3px; border-radius: 1.5px; background: var(--line-2); }
+.bars i:nth-child(1) { height: 5px; }
+.bars i:nth-child(2) { height: 8px; }
+.bars i:nth-child(3) { height: 11px; }
+.tag.lvl[data-l="1"] .bars i:nth-child(-n+1),
+.tag.lvl[data-l="2"] .bars i:nth-child(-n+2),
+.tag.lvl[data-l="3"] .bars i:nth-child(-n+3) { background: var(--tone); }
+
+/* Confidence is continuous, so it gets a track instead of a class. */
+.conf { display: inline-flex; align-items: center; gap: 9px; }
+.conf-track { width: 44px; height: 5px; border-radius: 99px; background: var(--line);
+              overflow: hidden; flex: none; }
+.conf-track > i { display: block; height: 100%; border-radius: 99px;
+                  background: linear-gradient(90deg, var(--brand), var(--brand-light)); }
+.conf b { font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--ink-2); }
+
+/* --- progress ----------------------------------------------------------- */
+.bar { height: 6px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.bar > i { display: block; height: 100%; border-radius: 99px;
+           background: linear-gradient(90deg, var(--brand-light), var(--brand));
+           width: 0; transition: width .4s cubic-bezier(.4,0,.2,1); }
+.bar.indeterminate > i { width: 35% !important; animation: slide 1.3s ease-in-out infinite; }
+@keyframes slide { 0% { margin-left: -35%; } 100% { margin-left: 100%; } }
+
+/* --- misc --------------------------------------------------------------- */
+.muted { color: var(--ink-4); }
+.row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+details.detail summary {
+  cursor: pointer; color: var(--brand); font-weight: 550; font-size: 12.5px; list-style: none;
+}
+details.detail summary::-webkit-details-marker { display: none; }
+details.detail summary::before { content: "▸ "; }
+details.detail[open] summary::before { content: "▾ "; }
+.kv { font-family: var(--mono); font-size: 11.5px; color: var(--ink-3);
+      white-space: normal; padding: 10px 0 4px; max-width: 620px; line-height: 1.7; }
+.kv b { color: var(--ink-2); font-weight: 600; }
+/* --- inline audio playback --------------------------------------------- */
+.play {
+  width: 30px; height: 30px; border-radius: 50%; flex: none; padding: 0;
+  border: 1px solid color-mix(in srgb, var(--brand) 35%, var(--line));
+  background: var(--brand-tint); color: var(--brand);
+  display: grid; place-items: center; cursor: pointer;
+  transition: background .14s, color .14s, transform .06s;
+}
+.play:hover { background: var(--brand); color: #fff; }
+.play:active { transform: scale(.93); }
+.play[aria-pressed="true"] { background: var(--brand); color: #fff; }
+tr.playing td { background: color-mix(in srgb, var(--brand) 8%, transparent) !important; }
+.player-row td { padding: 0 14px 14px; }
+.player {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); padding: 11px 14px;
+}
+.player audio { flex: 1; height: 34px; min-width: 220px; }
+.player .lbl { font-size: 12px; color: var(--ink-3); white-space: nowrap; }
+
+/* --- upload rows --------------------------------------------------------
+   Used by the home-page preview and by /history, both of which render
+   _batchrow.html, so the rules live here rather than being copied into two
+   templates that then drift. */
+.batch {
+  display: flex; align-items: center; gap: 13px; text-decoration: none;
+  padding: 13px 24px; border-bottom: 1px solid var(--line); color: inherit;
+  transition: background .12s;
+}
+.batch:last-child { border-bottom: 0; }
+.batch:hover { background: var(--surface-2); }
+.batch-main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+/* An uploaded name can be arbitrarily long, and truncating it is much better
+   than letting it shove the timestamp off the row. */
+.batch-title, .batch-sub {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.batch-title { font-size: 14px; font-weight: 570; color: var(--ink); }
+.batch-sub { font-size: 12.5px; color: var(--ink-4); margin-top: 1px; }
+.batch-when { font-size: 12.5px; color: var(--ink-4); white-space: nowrap; }
+.batch-go { color: var(--ink-4); font-size: 18px; line-height: 1; }
+.batch:hover .batch-go { color: var(--brand); }
+/* A live upload pulses, so "still going" is visible without reading. */
+.dot.pulse { animation: dotPulse 1.4s ease-in-out infinite; }
+@keyframes dotPulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .dot.pulse { animation: none; } }
+
+/* --- pills / chips ------------------------------------------------------ */
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11.5px; font-weight: 600; letter-spacing: .02em;
+  padding: 3px 9px; border-radius: 99px;
+  background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-3);
+}
+.chip.brand { background: var(--brand-tint); border-color: var(--brand-ring); color: var(--brand); }
+
+/* Two children, space-between: the old version used a flex:1 spacer between
+   four siblings, which on anything narrower than a desktop wrapped into a
+   ragged two-row block with a hole in the middle. */
+footer { flex: none; border-top: 1px solid var(--line);
+         position: relative; z-index: 1; }
+.footer-inner {
+  width: 100%; max-width: 1240px; margin: 0 auto; padding: 18px 24px 28px;
+  color: var(--ink-4); font-size: 12px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px 24px; flex-wrap: wrap;
+}
+.foot-right { display: flex; align-items: center; gap: 16px; }
+</style>
+</head>
+<body>
+
+{% if user %}
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="logo" href="/">
+      <span class="logo-mark">A</span>
+      <span class="logo-word">Auto<b>Ace</b></span>
+    </a>
+    <nav class="nav">
+      <a href="/">Upload</a>
+      <a href="/history">History</a>
+    </nav>
+    <span class="spacer"></span>
+    <span class="who">
+      <span class="avatar">{{ user[0]|upper }}</span>{{ user }}
+    </span>
+    <a class="btn ghost sm" href="/logout">Sign out</a>
+  </div>
+</header>
+{% endif %}
+
+<main>{% block body %}{% endblock %}</main>
+
+{% block footer %}
+<footer><div class="footer-inner">
+  <span>© AutoAce · Voice tone and background noise analysis</span>
+  <span class="foot-right">
+    <span>v{{ version }}</span>
+  </span>
+</div></footer>
+{% endblock %}
+
+</body>
+</html>

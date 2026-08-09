@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}History · AutoAce{% endblock %}
+{% block body %}
+
+<div class="head-row" style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:22px">
+  <div>
+    <h1>Your uploads</h1>
+    <p class="muted" style="margin:2px 0 0;font-size:13.5px">
+      {% if recent %}
+        {{ recent | length }} upload{{ '' if recent | length == 1 else 's' }} ·
+        analysis continues whether or not this page is open
+      {% else %}
+        Nothing uploaded yet
+      {% endif %}
+    </p>
+  </div>
+  <span style="flex:1"></span>
+  <a class="btn" href="/">Upload recordings</a>
+</div>
+
+{% if recent %}
+<div class="card flush">
+  <div class="batches">
+    {% for b in recent %}{% include "_batchrow.html" with context %}{% endfor %}
+  </div>
+</div>
+<p class="muted" style="font-size:12.5px">
+  Showing your {{ limit }} most recent uploads. Download the CSV or JSON from
+  any result page to keep a copy.
+</p>
+{% else %}
+<div class="card" style="text-align:center;padding:56px 24px">
+  <div style="width:46px;height:46px;border-radius:13px;margin:0 auto 14px;
+              background:var(--brand-tint);border:1px solid var(--brand-ring);
+              display:grid;place-items:center;color:var(--brand)">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 16V4m0 0L8 8m4-4l4 4"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>
+    </svg>
+  </div>
+  <h3 style="margin:0 0 5px;font-size:16px;font-weight:620">Nothing here yet</h3>
+  <p class="muted" style="margin:0 0 18px;font-size:13.5px">
+    Upload some recordings and they will show up here.
+  </p>
+  <a class="btn" href="/">Upload recordings</a>
+</div>
+{% endif %}
+
+<script>
+/* Refresh while anything is still running, so a batch left on this page
+   updates without the user reaching for reload. */
+if (document.querySelector('.dot.pulse')) {
+  setTimeout(() => location.reload(), 5000);
+}
+</script>
+{% endblock %}

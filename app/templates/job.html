@@ -1,0 +1,386 @@
+{% extends "base.html" %}
+{% block title %}{{ job.title }} · AutoAce{% endblock %}
+{% block body %}
+<style>
+  .crumb { font-size: 13px; color: var(--ink-4); margin-bottom: 10px; }
+  .crumb a { color: var(--brand); text-decoration: none; }
+  .crumb a:hover { text-decoration: underline; }
+  .head-row { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
+  .head-row h1 { margin: 0; }
+  .head-row .spacer { flex: 1; }
+  .report { background: var(--surface-2); border: 1px solid var(--line);
+            border-radius: var(--radius); padding: 16px 18px; }
+</style>
+
+<div class="crumb"><a href="/history">&lsaquo; Back to history</a></div>
+
+<div class="head-row">
+  <div>
+    {# One recording is not a batch, and the job id is an internal handle that
+       means nothing to the person reading the page. It stays in the URL and in
+       the downloaded filenames, where it is actually useful. #}
+    <h1>{% if job.total == 1 %}Call results{% else %}Results{% endif %}</h1>
+    <p class="muted" style="margin:2px 0 0;font-size:13.5px">
+      {# What was uploaded, then how much was in it. On a ZIP those are two
+         different things and both are worth saying. #}
+      {% set titled_by_its_only_file = job.total == 1 and job.results
+                                       and job.sources[:1] == [job.results[0].name] %}
+      <span class="mono">{{ job.title }}</span>
+      {% if not titled_by_its_only_file %}
+        &middot; {{ job.total }} recording{{ '' if job.total == 1 else 's' }}
+      {% endif %}
+    </p>
+  </div>
+  <span class="spacer"></span>
+  <div class="row" id="dlbar" {% if job.status not in ('done','error') %}style="display:none"{% endif %}>
+    <a class="btn ghost" href="/jobs/{{ job.id }}/download.csv">Download CSV</a>
+    <a class="btn" href="/jobs/{{ job.id }}/download.json">Download JSON</a>
+  </div>
+</div>
+
+<!-- KPI row: four scalars with no shape to plot, so hero numbers, not charts. -->
+<div class="kpis">
+  <div class="kpi">
+    <div class="kpi-label">Progress</div>
+    <div class="kpi-value" id="k-done">{{ job.completed }}<small>/{{ job.total }}</small></div>
+    <div class="kpi-note" id="k-status">{{ job.status }}</div>
+  </div>
+  <div class="kpi is-good">
+    <div class="kpi-label"><span class="dot good"></span>Succeeded</div>
+    <div class="kpi-value" id="k-ok">{{ job.results | selectattr('status','equalto','ok') | list | length }}</div>
+    <div class="kpi-note">analysed cleanly</div>
+  </div>
+  {% set n_failed = job.results | selectattr('status','equalto','failed') | list | length %}
+  <div class="kpi {{ 'is-critical' if n_failed else 'is-neutral' }}">
+    <div class="kpi-label"><span class="dot {{ 'critical' if n_failed else 'idle' }}"></span>Failed</div>
+    <div class="kpi-value" id="k-fail">{{ n_failed }}</div>
+    <div class="kpi-note">reason shown in the table</div>
+  </div>
+  <div class="kpi is-neutral">
+    <div class="kpi-label">Elapsed</div>
+    <div class="kpi-value" id="k-time">{{ '%.0f'|format(job.elapsed) }}<small>s</small></div>
+    <div class="kpi-note" id="k-note">total time</div>
+  </div>
+  {% if report_data %}
+  <div class="kpi is-accuracy">
+    <div class="kpi-label">Mean field accuracy</div>
+    <div class="kpi-value">{{ '%.1f'|format(report_data.mean_field_accuracy * 100) }}<small>%</small></div>
+    <div class="kpi-note">across {{ report_data.n_scored }} labelled file{{ '' if report_data.n_scored == 1 else 's' }}</div>
+  </div>
+  {% endif %}
+</div>
+
+<div class="card" id="progress-card" {% if job.status in ('done','error') %}style="display:none"{% endif %}>
+  <div class="row" style="justify-content:space-between;margin-bottom:11px">
+    <span id="cur" style="font-size:14px;font-weight:560">Starting…</span>
+    <span id="pct" class="muted" style="font-size:13px">0%</span>
+  </div>
+  <div class="bar" id="bar"><i></i></div>
+  <p class="muted" id="sub" style="font-size:12.5px;margin:11px 0 0">
+    You can leave this page open.
+  </p>
+</div>
+
+{% if job.error %}
+<div class="notice bad"><span class="dot critical"></span>
+  <span><b>This upload could not be processed.</b> {{ job.error }}</span></div>
+{% endif %}
+
+{% if 'emotion' not in stack %}
+<div class="notice warn">
+  <span class="dot warning"></span>
+  <span><b>Emotion analysis is switched off in this deployment.</b>
+    Tone and intensity below are the neutral fallback, not a measurement &mdash;
+    every row will read <code>neutral / low</code>. The active stack is
+    <code>{{ stack | join(', ') }}</code>; restart without
+    <code>VOICETONE_STACK</code> to enable the full pipeline.</span>
+</div>
+{% endif %}
+
+{% if job.warnings or job.unmatched_labels or job.unlabelled_audio or job.skipped %}
+<div class="notice info">
+  <span class="dot idle"></span>
+  <span>
+    <b>Upload check</b> &mdash; none of this is fatal; everything else still ran.
+    <ul style="margin:7px 0 0;padding-left:18px">
+      {% for w in job.warnings %}<li>{{ w }}</li>{% endfor %}
+      {% if job.skipped %}
+      <li>{{ job.skipped|length }} non-audio file{{ '' if job.skipped|length == 1 else 's' }}
+        ignored:
+        <span class="mono">{{ job.skipped[:8]|join(', ') }}{% if job.skipped|length > 8 %} …{% endif %}</span></li>
+      {% endif %}
+      {% if job.unmatched_labels %}
+      <li>{{ job.unmatched_labels|length }} manifest row(s) with no matching audio:
+        <span class="mono">{{ job.unmatched_labels[:8]|join(', ') }}{% if job.unmatched_labels|length > 8 %} …{% endif %}</span></li>
+      {% endif %}
+      {% if job.unlabelled_audio %}
+      <li>{{ job.unlabelled_audio|length }} audio file(s) with no manifest row, processed but unscored:
+        <span class="mono">{{ job.unlabelled_audio[:8]|join(', ') }}{% if job.unlabelled_audio|length > 8 %} …{% endif %}</span></li>
+      {% endif %}
+    </ul>
+  </span>
+</div>
+{% endif %}
+
+{% if job.results %}
+<div class="card flush">
+  <div class="card-head">
+    <h2>{% if job.total == 1 %}What we found{% else %}Per-recording results{% endif %}</h2>
+    <span class="spacer" style="flex:1"></span>
+    <span class="muted" style="font-size:12px">Click a column to sort</span>
+  </div>
+  <div class="scroll">
+    <table id="tbl">
+      {# No status column: a row that worked says so by having values in it,
+         and a row that did not is unmistakable. It cost a column of "ok". #}
+      <thead><tr>
+        {% if playback %}<th style="cursor:default"></th>{% endif %}
+        <th data-i="0">Recording</th>
+        <th data-i="1" title="How the customer came across over the call">How the customer sounded</th>
+        <th data-i="2" title="How strongly that came through">How strongly</th>
+        <th data-i="3" title="Whether anything else was audible behind the speaker">Any background noise</th>
+        <th data-i="4" title="What the background noise was">What the noise was</th>
+        <th data-i="5" title="How loud the noise was next to the speech">How loud the noise was</th>
+        <th data-i="6" title="Whether the recording itself was clean to listen to">Line quality</th>
+        <th data-i="7" title="Whether the two people talked over one another">Talking over each other</th>
+        <th data-i="8" title="Whether the call went quiet for an unusually long stretch">Long silences</th>
+        <th data-i="9" title="How sure the analysis is about this recording">Confidence</th>
+        <th>Details</th>
+      </tr></thead>
+      <tbody>
+      {% for r in job.results %}
+        {% set res = r.result %}
+        <tr data-name="{{ r.name }}">
+          {% if playback %}
+          <td>
+            {% if job.audio_available and r.status == 'ok' %}
+            <button class="play" type="button" aria-pressed="false"
+                    aria-label="Play {{ r.name }}" title="Play this clip">
+              <svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor"><path d="M3 1.5v9l7-4.5z"/></svg>
+            </button>
+            {% endif %}
+          </td>
+          {% endif %}
+          <td class="name" title="{{ r.name }}">
+            {% if r.status != 'ok' %}<span class="dot critical"
+                 style="margin-right:7px" title="Could not be read"></span>{% endif %}{{ r.name }}
+          </td>
+          {% if res %}
+            {# Tone runs satisfied -> distressed, so the tint tracks the same
+               order the scorer treats as ordinal. #}
+            {% set tone_tint = {'satisfied': 't-good', 'neutral': 't-idle',
+                                'frustrated': 't-warn', 'upset': 't-serious',
+                                'distressed': 't-bad'} %}
+            {# data-sort keeps ordinal columns in their real order. Sorting on
+               the visible word puts High before Low before Medium. #}
+            <td data-sort="{{ tone_order.index(res.emotional_tone) }}">
+              <span class="tag {{ tone_tint[res.emotional_tone] }}">{{ res.emotional_tone|capitalize }}</span></td>
+
+            {% set lv = {'low': 1, 'medium': 2, 'high': 3} %}
+            <td data-sort="{{ lv[res.emotional_intensity] }}">
+              <span class="tag lvl t-info" data-l="{{ lv[res.emotional_intensity] }}">
+                <span class="bars"><i></i><i></i><i></i></span>{{ res.emotional_intensity|capitalize }}</span>
+            </td>
+
+            <td data-sort="{{ 1 if res.background_noise_present else 0 }}">
+              {% if res.background_noise_present %}
+                <span class="tag t-warn">Yes</span>
+              {% else %}
+                <span class="tag plain">No</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if res.background_noise_type %}
+                <span class="tag plain">{{ res.background_noise_type.replace('_', ' ')|capitalize }}</span>
+              {% else %}
+                <span class="tag plain">None</span>
+              {% endif %}
+            </td>
+            <td data-sort="{{ severity_order.index(res.background_noise_severity) }}">
+              {% if res.background_noise_severity == 'none' %}
+                <span class="tag plain">None</span>
+              {% else %}
+                <span class="tag lvl {{ {'low':'t-good','medium':'t-warn','high':'t-serious'}[res.background_noise_severity] }}"
+                      data-l="{{ lv[res.background_noise_severity] }}">
+                  <span class="bars"><i></i><i></i><i></i></span>{{
+                  {'low':'Faint','medium':'Noticeable','high':'Loud'}[res.background_noise_severity] }}</span>
+              {% endif %}
+            </td>
+            <td data-sort="{{ quality_order.index(res.audio_quality) }}">
+              <span class="tag {{ {'clear':'t-good','slightly_impaired':'t-warn','severely_impaired':'t-bad'}[res.audio_quality] }}">{{
+                {'clear':'Clear','slightly_impaired':'Slightly rough','severely_impaired':'Hard to hear'}[res.audio_quality] }}</span>
+            </td>
+            <td data-sort="{{ 1 if res.speaker_overlap_present else 0 }}">
+              {% if res.speaker_overlap_present %}<span class="tag t-warn">Yes</span>
+              {% else %}<span class="tag plain">No</span>{% endif %}
+            </td>
+            <td data-sort="{{ 1 if res.long_silence_present else 0 }}">
+              {% if res.long_silence_present %}<span class="tag t-warn">Yes</span>
+              {% else %}<span class="tag plain">No</span>{% endif %}
+            </td>
+            <td data-sort="{{ '%.4f'|format(res.confidence) }}">
+              <span class="conf">
+                <span class="conf-track"><i style="width:{{ (res.confidence * 100)|round|int }}%"></i></span>
+                <b>{{ '%.2f'|format(res.confidence) }}</b>
+              </span>
+            </td>
+          {% else %}
+            <td colspan="9" class="state-bad">{{ r.error or 'no result' }}</td>
+          {% endif %}
+          <td>
+            <details class="detail"><summary>open</summary>
+              <div class="kv">
+                <b>timing</b> · audio {{ '%.1f'|format(r.audio_s) }}s ·
+                elapsed {{ '%.1f'|format(r.elapsed_s) }}s{% if r.rtf %} · RTF {{ '%.3f'|format(r.rtf) }}{% endif %}<br>
+                {% if r.stage_times %}
+                <b>stages</b> · {% for k, v in r.stage_times.items() %}{{ k }} {{ '%.2f'|format(v) }}s{% if not loop.last %} · {% endif %}{% endfor %}<br>
+                {% endif %}
+                {% if r.latents %}
+                <b>latents</b> · {% for k, v in r.latents.items() %}{% if v is not none and v != [] and v != {} and k not in ('notes','quality_detail','stubbed') %}{{ k }}={{ v }} {% endif %}{% endfor %}<br>
+                {% endif %}
+                {% if r.latents and r.latents.notes %}
+                <b>notes</b><br>{% for n in r.latents.notes %}&nbsp;&nbsp;{{ n }}<br>{% endfor %}
+                {% endif %}
+                {% if r.warnings %}
+                <b>warnings</b><br>{% for w in r.warnings %}&nbsp;&nbsp;{{ w }}<br>{% endfor %}
+                {% endif %}
+              </div>
+            </details>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% if report %}
+<div class="card">
+  <h2>Scored against your manifest</h2>
+  <div class="report"><pre>{{ report }}</pre></div>
+  <p class="muted" style="font-size:12.5px;margin:14px 0 0">
+    Adjacent accuracy sits beside exact match because tone, intensity, severity
+    and quality are ordinal &mdash; a <code>frustrated</code>/<code>upset</code>
+    confusion is not the same error as <code>satisfied</code>/<code>distressed</code>.
+  </p>
+</div>
+{% endif %}
+
+<script>
+const jobId = "{{ job.id }}";
+const live  = {{ 'false' if job.status in ('done', 'error') else 'true' }};
+
+document.querySelectorAll('#tbl thead th[data-i]').forEach(th => {
+  th.addEventListener('click', () => {
+    const off = {{ 1 if playback else 0 }};
+    const i = +th.dataset.i + off, body = document.querySelector('#tbl tbody');
+    const dir = th.dataset.dir === 'asc' ? -1 : 1;
+    document.querySelectorAll('#tbl thead th').forEach(o => o.removeAttribute('data-dir'));
+    th.dataset.dir = dir === 1 ? 'asc' : 'desc';
+    /* data-sort where a column is ordinal, the visible text otherwise. Tone,
+       intensity, severity and quality rank; sorting them alphabetically put
+       High above Low above Medium. */
+    const key = td => (td?.dataset.sort ?? td?.innerText ?? '').trim();
+    [...body.rows].sort((a, b) => {
+      const x = key(a.cells[i]), y = key(b.cells[i]);
+      const nx = parseFloat(x), ny = parseFloat(y);
+      if (!isNaN(nx) && !isNaN(ny)) return (nx - ny) * dir;
+      return x.localeCompare(y) * dir;
+    }).forEach(r => { body.appendChild(r);
+                      const pr = r.nextPlayerRow; if (pr) body.appendChild(pr); });
+  });
+});
+
+async function poll() {
+  try {
+    const r = await fetch('/jobs/' + jobId + '/status');
+    if (r.status === 401) { location.href = '/login'; return; }
+    const j = await r.json();
+    document.querySelector('#bar > i').style.width = j.percent + '%';
+    document.getElementById('k-done').innerHTML = j.completed + '<small>/' + j.total + '</small>';
+    document.getElementById('k-ok').textContent = j.n_ok;
+    document.getElementById('k-fail').textContent = j.n_failed;
+    document.getElementById('k-time').innerHTML = Math.round(j.elapsed_s) + '<small>s</small>';
+    document.getElementById('k-status').textContent = j.status;
+    document.getElementById('pct').textContent = j.percent + '%';
+
+    /* Name the stage, not the internal state. "Reading the customer's tone"
+       tells someone what is happening; "running" does not. */
+    const cur = document.getElementById('cur');
+    if (j.status === 'running') {
+      cur.textContent = j.stage ? j.stage + ': ' + (j.current || '') : 'Analysing ' + (j.current || '');
+    } else if (j.status === 'queued') {
+      cur.textContent = 'Queued…';
+    } else {
+      cur.textContent = j.error || 'Finishing…';
+    }
+    /* Elapsed is already a KPI tile directly above this. Repeating it here
+       was two live counters of the same number, four inches apart. */
+    document.getElementById('sub').textContent =
+      j.total > 1 ? (j.completed + ' of ' + j.total + ' done')
+                  : 'You can leave this page open.';
+
+    if (j.status === 'done' || j.status === 'error') { location.reload(); return; }
+    setTimeout(poll, 1000);
+  } catch (ex) {
+    document.getElementById('cur').textContent = 'Lost contact with the server';
+    document.getElementById('sub').textContent = ex.message + '. Retrying…';
+    setTimeout(poll, 3000);
+  }
+}
+
+if (live) { poll(); }
+else { document.querySelector('#bar > i').style.width = '100%'; }
+
+/* ---- inline playback --------------------------------------------------
+   One <audio> element reused across rows: many elements each holding a
+   decoded buffer is a lot of memory on a big batch, and only one clip can
+   usefully play at a time anyway. */
+{% if playback %}
+let openRow = null;
+
+function closePlayer() {
+  if (!openRow) return;
+  openRow.row.classList.remove('playing');
+  openRow.row.querySelector('.play')?.setAttribute('aria-pressed', 'false');
+  openRow.player.remove();
+  openRow.row.nextPlayerRow = null;
+  openRow = null;
+}
+
+document.querySelectorAll('#tbl tbody .play').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const row = btn.closest('tr');
+    const name = row.dataset.name;
+    if (openRow && openRow.row === row) { closePlayer(); return; }
+    closePlayer();
+
+    const cols = row.cells.length;
+    const pr = document.createElement('tr');
+    pr.className = 'player-row';
+    pr.innerHTML = '<td colspan="' + cols + '"><div class="player">' +
+      '<span class="lbl">' + escapeHtml(name) + '</span>' +
+      '<audio controls autoplay preload="none" src="/jobs/' + jobId +
+      '/audio?name=' + encodeURIComponent(name) + '"></audio>' +
+      '</div></td>';
+    row.after(pr);
+    row.nextPlayerRow = pr;
+    row.classList.add('playing');
+    btn.setAttribute('aria-pressed', 'true');
+    openRow = { row, player: pr };
+
+    const a = pr.querySelector('audio');
+    a.addEventListener('error', () => {
+      pr.querySelector('.player').innerHTML =
+        '<span class="lbl">Audio is no longer retained for this batch.</span>';
+    });
+  });
+});
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+{% endif %}
+</script>
+{% endblock %}

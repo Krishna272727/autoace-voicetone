@@ -1,0 +1,31 @@
+# Cloud Build uploads this directory as the build context. Without this file
+# that includes the 1.3 GB virtualenv, which is then discarded because the image
+# installs its own dependencies. Same reasoning as .dockerignore; gcloud does
+# not read that file, so the list is repeated here.
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+.hf_cache/
+.cache/
+
+# Regenerable, and 20 MB of WAVs only the threshold tuner reads.
+synthetic/
+results/
+
+# The client's real call recordings. These must not leave this machine: the
+# whole data-handling claim is that customer audio stays put, and shipping
+# three real calls into a build context on someone else's infrastructure
+# contradicts it. Evaluators upload their own audio.
+samples/
+
+.git/
+.github/
+.vscode/
+*.log
+.DS_Store
+.env
+deploy/

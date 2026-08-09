@@ -1,0 +1,350 @@
+{# ---------------------------------------------------------------------------
+   Audio in, results out.
+
+   The audio side is a CRT oscilloscope: bezel, amber phosphor trace, graticule,
+   scanlines, a warm-up lamp. A piece of bench gear sitting next to its readout.
+
+   This replaces a glowing cone that was meant to read as light carrying signal
+   into the table and instead read as a purple smudge. A blurred gradient has
+   no shape to get right; an instrument does, and getting it right is a matter
+   of drawing the parts.
+
+   The table is ALWAYS present -- every row, every label, all the time. Only
+   the values cross-fade between three example calls. An earlier version faded
+   the whole panel in and out on a cycle, which meant that for most of the loop
+   the audio visibly flowed into nothing.
+
+   Values wear the same tags the real results table uses, so this reads as the
+   product rather than as an illustration of it.
+
+   Plain SVG + CSS -- BUILD_SPEC 11.1 rules out a React app, and the container
+   has no outbound network access, so no framer-motion and nothing fetched at
+   runtime.
+--------------------------------------------------------------------------- #}
+{% set rows = [
+    ('Customer tone',    [('Upset', 't-serious'), ('Neutral', 't-idle'), ('Satisfied', 't-good')]),
+    ('How strongly',     [('High', 't-info'), ('Medium', 't-info'), ('Medium', 't-info')]),
+    ('Background noise', [('Nothing audible', 'plain'), ('Television', 'plain'), ('Static', 'plain')]),
+    ('How loud it was',  [('None', 'plain'), ('Noticeable', 't-warn'), ('Noticeable', 't-warn')]),
+    ('Line quality',     [('Clear', 't-good'), ('Clear', 't-good'), ('Clear', 't-good')]),
+    ('Talking over',     [('No', 'plain'), ('No', 'plain'), ('No', 'plain')]),
+    ('Long silences',    [('No', 'plain'), ('No', 'plain'), ('No', 'plain')]),
+    ('Confidence',       [('0.58', 'num'), ('0.63', 'num'), ('0.70', 'num')]) ] %}
+
+{# Trace envelope: 68 samples, alternating sign, so the trace reads as an
+   audio-rate signal under a moving envelope rather than as a sine.
+
+   Four bursts separated by near-silence. An earlier envelope never dropped
+   below a third of full scale, and at this point density the trace bloomed
+   into one solid amber slab with the graticule invisible behind it. Speech has
+   gaps in it, and drawing them is what makes this read as speech.
+
+   First and last values match, which is what lets three copies tile into an
+   endless scroll with no visible seam. #}
+{% set amp = [
+    2,  4,  8, 15, 25, 38, 48, 53, 55, 51, 44, 34, 24, 15,  9,  5,
+    4,  6, 14, 24, 35, 45, 53, 55, 54, 48, 39, 29, 19, 11,  6,  4,
+    2,  2,  5, 11, 20, 31, 41, 49, 53, 54, 50, 43, 33, 23, 14,  8,
+    4,  2,  5, 10, 19, 29, 39, 46, 51, 53, 49, 41, 31, 21, 12,  8,
+    4,  2,  2,  2] %}
+{%- set pts = [] -%}
+{%- for a in amp -%}
+  {%- set _ = pts.append('%.1f,%.1f' % (loop.index0 * 5.941,
+                          107 - (a if loop.index0 % 2 == 0 else -a))) -%}
+{%- endfor -%}
+
+<div class="io">
+  <div class="io-cap">1 &middot; Your recording</div>
+  <div class="io-cap">2 &middot; We listen to it</div>
+  <div class="io-cap">3 &middot; What you get back</div>
+
+  <div class="io-in" aria-hidden="true">
+    <div class="io-file">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+      </svg>
+      <span>call_002.ogg</span>
+    </div>
+    <div class="io-mini">
+      {% for h in [9,17,26,14,31,22,38,18,29,12,34,20] %}
+      <i style="--h:{{ h }}px; --i:{{ loop.index0 }}"></i>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="io-audio" aria-hidden="true">
+    <svg viewBox="0 0 460 320" fill="none" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <linearGradient id="ioBody" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stop-color="#2A2A33"/>
+          <stop offset="46%"  stop-color="#16161C"/>
+          <stop offset="100%" stop-color="#0B0B10"/>
+        </linearGradient>
+        <radialGradient id="ioGlass" cx="50%" cy="42%" r="72%">
+          <stop offset="0%"   stop-color="#1A150C"/>
+          <stop offset="62%"  stop-color="#0C0A0B"/>
+          <stop offset="100%" stop-color="#050408"/>
+        </radialGradient>
+        <linearGradient id="ioSheen" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%"   stop-color="#fff" stop-opacity=".07"/>
+          <stop offset="38%"  stop-color="#fff" stop-opacity=".015"/>
+          <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
+        </linearGradient>
+        <radialGradient id="ioVig" cx="50%" cy="50%" r="62%">
+          <stop offset="55%"  stop-color="#000" stop-opacity="0"/>
+          <stop offset="100%" stop-color="#000" stop-opacity=".62"/>
+        </radialGradient>
+        <radialGradient id="ioKnob" cx="38%" cy="30%" r="78%">
+          <stop offset="0%"   stop-color="#3A3A45"/>
+          <stop offset="100%" stop-color="#131318"/>
+        </radialGradient>
+
+        {# Phosphor bloom: a blur merged twice under the sharp trace, giving a
+           bright core inside a soft halo.
+
+           This was briefly replaced with stacked strokes to avoid filtering an
+           animated element. On a smooth line that works; on a dense zigzag the
+           wide layer merges into an opaque slab with a scalloped edge, which
+           looked considerably worse than the cost it saved. #}
+        <filter id="ioPhos" x="-15%" y="-45%" width="130%" height="190%">
+          <feGaussianBlur stdDeviation="2.6" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="b"/>
+                   <feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <filter id="ioLamp" x="-300%" y="-300%" width="700%" height="700%">
+          <feGaussianBlur stdDeviation="3"/></filter>
+
+        <pattern id="ioScan" width="3" height="3" patternUnits="userSpaceOnUse">
+          <rect width="3" height="1.4" fill="#000" opacity=".38"/>
+        </pattern>
+
+        <clipPath id="ioScreenClip"><rect width="404" height="214" rx="9"/></clipPath>
+        {# stroke and stroke-width are deliberately NOT set here. They are
+           inherited properties, and inheritance crosses the <use> boundary, so
+           each layer below sets its own width on the wrapping <g> and this one
+           path draws the halo, the mid glow and the core.
+
+           (fill and stroke-linejoin are set, because those never vary.) #}
+        <path id="ioTrace" d="M{{ pts | join(' L') }}" fill="none" stroke-linejoin="round"/>
+      </defs>
+
+      <!-- case ========================================================= -->
+      <!-- Ground shadow as three stacked rounded rects rather than a CSS
+           drop-shadow. A filter anywhere above the trace would be recomputed
+           on every animation frame; this is static geometry the rasteriser
+           touches once. -->
+      {% for dx, dy, r, o in [(1, 4, 21, '.5'), (3, 7, 22, '.4'), (6, 10, 23, '.3')] %}
+      <rect x="{{ 8 + dx }}" y="{{ 10 + dy }}" width="{{ 444 - 2 * dx }}"
+            height="{{ 300 - dy }}" rx="{{ r }}" fill="#000" opacity="{{ o }}"/>
+      {% endfor %}
+      <rect x="8" y="10" width="444" height="300" rx="20" fill="url(#ioBody)"/>
+      <rect x="8.5" y="10.5" width="443" height="299" rx="19.5"
+            stroke="#33333F" stroke-width="1"/>
+      <!-- Light catching the top edge of the case. At full brand violet this
+           read as a stray line floating above the object rather than as an
+           edge on it, so it is a hint of colour on a white highlight. -->
+      <path d="M32 11.4 H428" stroke="#fff" stroke-opacity=".1" stroke-width="1.1"/>
+      <path d="M110 11.4 H350" stroke="var(--brand-light)" stroke-opacity=".22" stroke-width="1.1"/>
+
+      {% for cx, cy in [(26, 28), (434, 28), (26, 292), (434, 292)] %}
+      <g>
+        <circle cx="{{ cx }}" cy="{{ cy }}" r="3.6" fill="#0A0A0E" stroke="#3A3A46" stroke-width=".8"/>
+        <path d="M{{ cx - 2 }} {{ cy - 1.2 }} L{{ cx + 2 }} {{ cy + 1.2 }}"
+              stroke="#4A4A58" stroke-width=".9" stroke-linecap="round"/>
+      </g>
+      {% endfor %}
+
+      <!-- screen ======================================================= -->
+      <rect x="25" y="27" width="410" height="220" rx="12" fill="#050509"
+            stroke="#000" stroke-opacity=".8"/>
+      <g transform="translate(28 30)">
+        <g clip-path="url(#ioScreenClip)">
+          <rect width="404" height="214" fill="url(#ioGlass)"/>
+
+          <!-- graticule -->
+          <g stroke="#FFC46B" stroke-opacity=".085" stroke-width=".7">
+            {% for k in range(1, 10) %}<path d="M{{ (k * 40.4) | round(1) }} 0 V214"/>{% endfor %}
+            {% for k in range(1, 8) %}<path d="M0 {{ (k * 26.75) | round(1) }} H404"/>{% endfor %}
+          </g>
+          <g stroke="#FFC46B" stroke-opacity=".2" stroke-width=".9">
+            <path d="M202 0 V214"/><path d="M0 107 H404"/>
+          </g>
+          <!-- division ticks on the centre axes: the detail that makes it read
+               as an instrument rather than as graph paper -->
+          <g stroke="#FFC46B" stroke-opacity=".22" stroke-width=".7">
+            {% for k in range(1, 50) %}<path d="M{{ (k * 8.08) | round(1) }} 104 v6"/>{% endfor %}
+            {% for k in range(1, 24) %}<path d="M199 {{ (k * 8.92) | round(1) }} h6"/>{% endfor %}
+          </g>
+
+          <!-- The trace: three tiled copies scrolled by one period, so it
+               never ends. The phosphor bloom is three stroke widths stacked
+               rather than a Gaussian blur, because a blur on an element that
+               moves every frame has to be recomputed every frame. Stacked
+               strokes are plain geometry and cost nothing to animate.
+
+               The widest layer also runs a beat behind, which is the smear a
+               real phosphor leaves. -->
+          {# The smear a real phosphor leaves: same trace, dimmer and wider,
+             running a beat behind. Narrow enough not to blob. #}
+          <g class="io-afterglow" stroke="#FFA63C" stroke-width="3" opacity=".26">
+            <use href="#ioTrace" x="0"/><use href="#ioTrace" x="404"/><use href="#ioTrace" x="808"/>
+          </g>
+          <g class="io-scroll" stroke="#FFC46B" stroke-width="1.9" filter="url(#ioPhos)">
+            <use href="#ioTrace" x="0"/><use href="#ioTrace" x="404"/><use href="#ioTrace" x="808"/>
+          </g>
+
+          <rect width="404" height="214" fill="url(#ioScan)"/>
+          <rect class="io-sweep" width="404" height="26" fill="#FFC46B" opacity=".05"/>
+          <rect width="404" height="214" fill="url(#ioVig)"/>
+          <rect width="404" height="214" fill="url(#ioSheen)"/>
+        </g>
+        <rect width="404" height="214" rx="9" stroke="#000" stroke-opacity=".7" stroke-width="1.6"/>
+      </g>
+
+      <!-- front panel ================================================== -->
+      <circle class="io-lamp" cx="45" cy="279" r="7" fill="#FF7A3D" filter="url(#ioLamp)"/>
+      <circle cx="45" cy="279" r="3.4" fill="#FFB07A"/>
+      <circle cx="45" cy="279" r="3.4" fill="none" stroke="#000" stroke-opacity=".5" stroke-width=".8"/>
+      <text class="io-plate" x="62" y="282">AUTOACE &#183; VOICE ANALYSER</text>
+
+      {% for cx, rot in [(360, -32), (398, 24)] %}
+      <g>
+        <circle cx="{{ cx }}" cy="279" r="12.5" fill="url(#ioKnob)" stroke="#000" stroke-opacity=".6"/>
+        <circle cx="{{ cx }}" cy="279" r="12.5" fill="none" stroke="#4A4A58" stroke-opacity=".5" stroke-width=".8"/>
+        <path transform="rotate({{ rot }} {{ cx }} 279)" d="M{{ cx }} 271.5 v-5.5"
+              stroke="#FFC46B" stroke-opacity=".8" stroke-width="1.8" stroke-linecap="round"/>
+      </g>
+      {% endfor %}
+    </svg>
+  </div>
+
+  <div class="io-out">
+    {% for label, values in rows %}
+    <div class="io-row">
+      <span class="io-k">{{ label }}</span>
+      <span class="io-vals">
+        {# Three values stacked in one slot; only the value cross-fades, so the
+           row itself never moves or empties. #}
+        {% for v, cls in values %}
+        <span class="io-v v{{ loop.index0 }} {{ 'num' if cls == 'num' else 'tag ' ~ cls }}">{{ v }}</span>
+        {% endfor %}
+        {% set widest = namespace(t='', c='') %}
+        {% for v, cls in values %}{% if v | length > widest.t | length %}{% set widest.t = v %}{% set widest.c = cls %}{% endif %}{% endfor %}
+        <span class="io-v io-ghost {{ 'num' if widest.c == 'num' else 'tag ' ~ widest.c }}">{{ widest.t }}</span>
+      </span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<style>
+/* Three stages, left to right: the recording goes in, the analyser reads it,
+   the fields come out. Previously the scope and the table sat side by side
+   with nothing saying they were the same story. */
+.io {
+  display: grid;
+  grid-template-columns: 148px minmax(0, 1fr) minmax(0, 1.05fr);
+  grid-template-rows: auto 1fr;
+  gap: 12px 22px; align-items: center;
+}
+@media (max-width: 1000px) {
+  .io { grid-template-columns: 1fr; grid-template-rows: none; gap: 10px; }
+  .io-audio { max-width: 460px; margin: 0 auto; }
+  .io-in { flex-direction: row; justify-content: center; align-items: center; }
+  /* Stacked, the captions have to sit with their own stage rather than in a
+     row of their own. */
+  .io-cap:nth-of-type(1) { order: 1 } .io-in    { order: 2 }
+  .io-cap:nth-of-type(2) { order: 3 } .io-audio { order: 4 }
+  .io-cap:nth-of-type(3) { order: 5 } .io-out   { order: 6 }
+}
+
+.io-cap {
+  align-self: end;
+  font-size: 10.5px; font-weight: 650; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--ink-4);
+}
+
+.io-in { display: flex; flex-direction: column; gap: 12px; }
+.io-file {
+  display: inline-flex; align-items: center; gap: 8px; align-self: flex-start;
+  font-family: var(--mono); font-size: 11px; color: var(--ink-3);
+  background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: 8px; padding: 7px 10px;
+}
+.io-file svg { color: var(--brand); flex: none; }
+/* A small live waveform: the signal before the instrument sees it. */
+.io-mini { display: flex; align-items: center; gap: 3px; height: 40px; }
+.io-mini i {
+  width: 3px; height: var(--h); border-radius: 2px; display: block;
+  background: linear-gradient(180deg, var(--brand-light), var(--brand));
+  animation: ioMini 1.7s ease-in-out infinite;
+  animation-delay: calc(var(--i) * -0.11s);
+}
+@keyframes ioMini { 0%,100% { transform: scaleY(.4); } 50% { transform: scaleY(1); } }
+.io-audio svg { width: 100%; height: auto; display: block; }
+
+/* --- the scope ---------------------------------------------------------- */
+/* One full period per cycle, so the tiled copies hand over invisibly.
+   Transform-only, so these ride the compositor and never repaint. */
+.io-scroll, .io-afterglow { animation: ioScroll 3.6s linear infinite;
+                            will-change: transform; }
+.io-afterglow { animation-delay: -.16s; }
+@keyframes ioScroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-404px); }
+}
+.io-sweep { animation: ioSweep 5.5s linear infinite; }
+@keyframes ioSweep {
+  from { transform: translateY(-30px); }
+  to   { transform: translateY(216px); }
+}
+.io-lamp { animation: ioLamp 3.4s ease-in-out infinite; }
+@keyframes ioLamp { 0%, 100% { opacity: .5; } 50% { opacity: .95; } }
+.io-plate {
+  font-family: var(--mono); font-size: 8.5px; font-weight: 600;
+  letter-spacing: 1.7px; fill: #6E6E7C;
+}
+
+/* --- the result table: always on screen ------------------------------- */
+.io-out {
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--surface-2); overflow: hidden;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .045);
+}
+.io-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; padding: 10px 16px; border-bottom: 1px solid var(--line);
+}
+.io-row:last-child { border-bottom: 0; }
+.io-k { font-size: 13.5px; color: var(--ink-3); }
+.io-vals { position: relative; display: inline-block; text-align: right; }
+/* Positioning only. Looks come from .tag, so these values and the ones in the
+   real results table cannot drift apart. */
+.io-v {
+  position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+  white-space: nowrap; opacity: 0;
+  animation: ioVal 13.5s ease-in-out infinite;
+}
+.io-v.num { font-family: var(--mono); font-size: 13px; color: var(--ink); }
+/* An invisible copy of the widest value holds the slot open, so nothing
+   reflows as the values swap. */
+.io-ghost { position: static; visibility: hidden; animation: none; opacity: 1;
+            transform: none; }
+.io-v.v0 { animation-delay: 0s; }
+.io-v.v1 { animation-delay: -9s; }
+.io-v.v2 { animation-delay: -4.5s; }
+@keyframes ioVal {
+  0%        { opacity: 0; transform: translateY(-50%) translateX(5px); }
+  5%, 30%   { opacity: 1; transform: translateY(-50%) translateX(0); }
+  35%, 100% { opacity: 0; transform: translateY(-50%) translateX(-5px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .io-scroll, .io-afterglow, .io-sweep, .io-lamp, .io-v, .io-mini i { animation: none; }
+  .io-sweep { opacity: 0; }
+  .io-v { opacity: 0; }
+  .io-v.v0 { opacity: 1; transform: translateY(-50%); }
+  .io-ghost { opacity: 1; }
+}
+</style>

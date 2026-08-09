@@ -1,0 +1,355 @@
+{% extends "base.html" %}
+{% block body %}
+<style>
+  .hero { max-width: 640px; margin: 20px 0 30px; }
+  .hero h1 { font-size: 36px; line-height: 1.12; margin-bottom: 12px; }
+  .hero .lede { font-size: 16.5px; margin-bottom: 0; }
+
+  /* The upload zone is the whole point of the page, so it gets the weight:
+     a violet wash behind it, a target big enough to throw a folder at, and a
+     border that reacts before you let go. */
+  .drop {
+    position: relative; overflow: hidden; isolation: isolate;
+    border: 1.5px dashed var(--line-2); border-radius: var(--radius-lg);
+    background: var(--surface-2); padding: 46px 28px 40px; text-align: center;
+    cursor: pointer;
+    transition: border-color .18s, background .18s, transform .18s;
+  }
+  /* A soft brand glow that only shows on hover or drag, painted behind the
+     content so it never washes out the text. */
+  .drop::before {
+    content: ""; position: absolute; inset: -40% -10% auto -10%; height: 180%;
+    z-index: -1; pointer-events: none; opacity: 0; transition: opacity .25s;
+    background: radial-gradient(50% 50% at 50% 40%,
+                color-mix(in srgb, var(--brand) 26%, transparent), transparent 70%);
+  }
+  .drop:hover { border-color: color-mix(in srgb, var(--brand) 55%, var(--line-2)); }
+  .drop:hover::before { opacity: .5; }
+  .drop.hot {
+    border-color: var(--brand); border-style: solid; transform: scale(1.006);
+  }
+  .drop.hot::before { opacity: 1; }
+
+  .drop-icon {
+    width: 62px; height: 62px; border-radius: 18px; margin: 0 auto 18px;
+    background: linear-gradient(150deg, var(--brand-light), var(--brand-dark) 78%);
+    display: grid; place-items: center; color: #fff;
+    box-shadow: 0 10px 26px var(--brand-ring), inset 0 1px 0 rgba(255,255,255,.28);
+    transition: transform .18s;
+  }
+  .drop:hover .drop-icon { transform: translateY(-3px); }
+  .drop.hot .drop-icon { transform: translateY(-5px) scale(1.05); }
+
+  .drop h3 { margin: 0 0 7px; font-size: 21px; font-weight: 650; letter-spacing: -0.03em; }
+  .drop p { margin: 0 auto; color: var(--ink-3); font-size: 14px; max-width: 44ch; }
+  .drop .or {
+    display: inline-flex; align-items: center; gap: 8px; margin-top: 20px;
+    font-size: 13.5px; font-weight: 580; color: var(--brand);
+    border: 1px solid var(--brand-ring); border-radius: 99px;
+    padding: 8px 18px; background: var(--surface);
+    transition: background .15s, border-color .15s;
+  }
+  .drop:hover .or { background: var(--brand); border-color: var(--brand); color: #fff; }
+
+  /* Accepted formats, stated rather than left to be discovered by failure. */
+  .formats {
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 6px;
+    margin: 22px auto 0; max-width: 660px;
+  }
+  .formats span {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .04em;
+    color: var(--ink-4); background: var(--surface);
+    border: 1px solid var(--line); border-radius: 6px; padding: 3px 7px;
+  }
+  /* Centred under the drop zone. Bottom-left made the primary action of the
+     whole page look like a form footer. */
+  .go-row { margin-top: 22px; flex-direction: column; gap: 8px; }
+  .go-btn {
+    padding: 14px 44px; font-size: 15.5px; font-weight: 620;
+    box-shadow: 0 8px 22px var(--brand-ring);
+  }
+  /* Before anything is picked the button has nothing to act on, so it recedes
+     rather than inviting a click that only produces an error. */
+  .go-btn.idle {
+    background: var(--surface); color: var(--ink-4);
+    border-color: var(--line-2); box-shadow: none;
+  }
+  .go-btn.idle:hover { background: var(--surface-2); color: var(--ink-3); }
+
+  .picked {
+    margin-top: 16px; text-align: left; font-size: 13px; color: var(--ink-2);
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius-sm); padding: 11px 8px 7px 14px; display: none;
+  }
+  .picked-head { display: flex; align-items: center; gap: 12px; padding-right: 6px; }
+  .picked-list {
+    list-style: none; margin: 4px 0 0; padding: 0 6px 0 0;
+    /* Every file is individually removable, so all of them are listed rather
+       than the first six -- the list scrolls instead of truncating. */
+    max-height: 236px; overflow-y: auto;
+  }
+  .picked-list li {
+    display: flex; align-items: center; gap: 10px; padding: 5px 0;
+    border-top: 1px solid var(--line); font-size: 12.5px;
+  }
+  .picked-list li:first-child { border-top: 0; }
+  .pick-name { flex: 1; min-width: 0; color: var(--ink-2);
+               overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pick-size { color: var(--ink-4); font-variant-numeric: tabular-nums; }
+  .pick-x {
+    flex: none; width: 24px; height: 24px; padding: 0; border-radius: 7px;
+    border: 1px solid transparent; background: none; color: var(--ink-4);
+    display: grid; place-items: center; cursor: pointer;
+    transition: color .12s, background .12s, border-color .12s;
+  }
+  .pick-x:hover, .pick-x:focus-visible {
+    outline: none; color: var(--critical);
+    background: color-mix(in srgb, var(--critical) 12%, transparent);
+    border-color: color-mix(in srgb, var(--critical) 34%, transparent);
+  }
+  .linkbtn {
+    font: inherit; font-size: 12.5px; font-weight: 550; cursor: pointer;
+    background: none; border: 0; padding: 4px 7px; border-radius: 7px;
+    color: var(--ink-4); transition: color .12s, background .12s;
+  }
+  .linkbtn:hover { color: var(--critical); background: var(--surface-2); }
+
+  .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; }
+  .step-n {
+    width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center;
+    background: var(--brand-tint); color: var(--brand); border: 1px solid var(--brand-ring);
+    font-size: 12px; font-weight: 700; margin-bottom: 9px;
+  }
+  .step h4 { margin: 0 0 4px; font-size: 14px; font-weight: 620; }
+  .step p { margin: 0; font-size: 13px; color: var(--ink-3); line-height: 1.55; }
+
+</style>
+
+<div class="hero">
+  <h1>Know how every call went</h1>
+  <p class="lede">
+    Upload your recordings and see how every customer sounded, what was going on
+    around them, and how well the line held up. No listening required.
+  </p>
+</div>
+
+{% if insecure %}
+<div class="notice warn">
+  <span class="dot warning"></span>
+  <span><b>Default credentials are active.</b> Set <code>DASHBOARD_USER</code>
+    and <code>DASHBOARD_PASS</code> before exposing this to a network.</span>
+</div>
+{% endif %}
+
+<div class="card">
+  <form id="f">
+    <div class="drop" id="drop">
+      <div class="drop-icon">
+        <svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 16V4m0 0L8 8m4-4l4 4"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>
+        </svg>
+      </div>
+      <h3>Drop your recordings here</h3>
+      <p>One call or ten thousand. Drop a zipped folder and we will find the
+         audio inside it, however deeply it is nested.</p>
+      <span class="or">Browse your files</span>
+      <div class="formats">
+        {% for f in ['wav','mp3','ogg','opus','flac','m4a','aac','wma','webm','mp4','aiff','zip'] %}
+        <span>{{ f }}</span>
+        {% endfor %}
+      </div>
+      <input type="file" id="files" name="files" multiple hidden
+             accept=".zip,.wav,.mp3,.ogg,.opus,.flac,.m4a,.aac,.wma,.webm,.mp4,.aiff,.au,.csv">
+    </div>
+    <div class="picked" id="picked">
+      <div class="picked-head">
+        <span id="pickedSum"></span>
+        <span class="spacer"></span>
+        <button type="button" class="linkbtn" id="clearAll">Remove all</button>
+      </div>
+      <ul class="picked-list" id="pickedList"></ul>
+    </div>
+
+    <div class="row go-row" style="justify-content:center">
+      <button class="btn go-btn" type="submit" id="go">Analyse</button>
+      <span id="msg" class="muted" style="font-size:13px"></span>
+    </div>
+  </form>
+  <div id="err" class="notice bad" style="display:none;margin:18px 0 0"></div>
+</div>
+
+{% if recent %}
+<div class="card flush">
+  <div class="card-head">
+    <h2>Recent uploads</h2>
+    <span class="spacer" style="flex:1"></span>
+    <a href="/history" style="font-size:13px;color:var(--brand);text-decoration:none;font-weight:550">
+      View all{% if total_batches > recent | length %} ({{ total_batches }}){% endif %} &rsaquo;
+    </a>
+  </div>
+  <div class="batches">
+    {% for b in recent %}{% include "_batchrow.html" with context %}{% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>From a recording to nine answers</h2>
+  {% include "_showcase.html" with context %}
+</div>
+
+<div class="card">
+  <h2>How it works</h2>
+  <div class="steps">
+    <div class="step">
+      <div class="step-n">1</div>
+      <h4>Drop in your calls</h4>
+      <p>One recording or ten thousand, in any common audio format. Nothing
+         needs renaming or converting first.</p>
+    </div>
+    <div class="step">
+      <div class="step-n">2</div>
+      <h4>We listen to each one</h4>
+      <p>Every recording is scored on its own, so a file that will not open gets
+         reported rather than quietly dropped.</p>
+    </div>
+    <div class="step">
+      <div class="step-n">3</div>
+      <h4>Review and export</h4>
+      <p>Sort the results, play any call back to check it yourself, then
+         download the lot as CSV or JSON.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const form  = document.getElementById('f');
+const input = document.getElementById('files');
+const drop  = document.getElementById('drop');
+const picked= document.getElementById('picked');
+const sum   = document.getElementById('pickedSum');
+const list  = document.getElementById('pickedList');
+const clear = document.getElementById('clearAll');
+const err   = document.getElementById('err');
+const msg   = document.getElementById('msg');
+const go    = document.getElementById('go');
+
+/* The <input> is not the source of truth. A browser replaces its FileList
+   wholesale on every pick, so through the input alone you can neither drop one
+   file from a selection nor add to one. This array is what gets uploaded. */
+let chosen = [];
+
+function addFiles(files) {
+  for (const f of files) {
+    const dup = chosen.some(g => g.name === f.name && g.size === f.size &&
+                                 g.lastModified === f.lastModified);
+    if (!dup) chosen.push(f);
+  }
+  render();
+}
+
+drop.addEventListener('click', () => input.click());
+['dragenter','dragover'].forEach(e => drop.addEventListener(e, ev => {
+  ev.preventDefault(); drop.classList.add('hot');
+}));
+['dragleave','drop'].forEach(e => drop.addEventListener(e, ev => {
+  ev.preventDefault(); drop.classList.remove('hot');
+}));
+drop.addEventListener('drop', ev => addFiles(ev.dataTransfer.files));
+input.addEventListener('change', () => {
+  addFiles(input.files);
+  // Emptying the input means re-picking the same file still fires `change`.
+  // Without it, adding back a file you had just removed would do nothing.
+  input.value = '';
+});
+
+list.addEventListener('click', ev => {
+  const x = ev.target.closest('.pick-x');
+  if (!x) return;
+  chosen.splice(+x.dataset.i, 1);
+  render();
+});
+clear.addEventListener('click', () => { chosen = []; render(); });
+
+render();   // set the initial button state before anything is picked
+
+/* "Analyse batch" is wrong for one file, and "1 files" is worse. The label
+   follows what was actually selected -- and a lone ZIP is described by what it
+   is, since how many calls are inside is unknown until the server opens it. */
+function label(fs) {
+  if (!fs.length) return 'Analyse';
+  if (fs.length === 1) {
+    return /\.zip$/i.test(fs[0].name) ? 'Analyse archive' : 'Analyse 1 recording';
+  }
+  return 'Analyse ' + fs.length + ' recordings';
+}
+
+function plural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
+
+function size(b) {
+  if (b >= 1048576) return (b / 1048576).toFixed(1) + ' MB';
+  if (b >= 1024)    return Math.round(b / 1024) + ' KB';
+  return b + ' B';
+}
+
+const X_ICON =
+  '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"' +
+  ' stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+
+function render() {
+  go.textContent = label(chosen);
+  // Nothing selected means the button has nothing to do; let it look that way.
+  go.classList.toggle('idle', chosen.length === 0);
+  // Picking a file answers whatever the last error complained about, so the
+  // notice goes with it. Without this, "Choose at least one recording first"
+  // stayed on screen next to a perfectly good selection.
+  if (chosen.length) { err.style.display = 'none'; }
+  if (!chosen.length) { picked.style.display = 'none'; return; }
+
+  const total = chosen.reduce((a, f) => a + f.size, 0);
+  sum.innerHTML = '<b>' + plural(chosen.length, 'file') + '</b> · ' + size(total);
+  clear.style.display = chosen.length > 1 ? '' : 'none';
+  list.innerHTML = chosen.map((f, i) =>
+    '<li><span class="pick-name">' + escapeHtml(f.name) + '</span>' +
+    '<span class="pick-size">' + size(f.size) + '</span>' +
+    '<button type="button" class="pick-x" data-i="' + i +
+    '" title="Remove" aria-label="Remove ' + escapeHtml(f.name) + '">' +
+    X_ICON + '</button></li>').join('');
+  picked.style.display = 'block';
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+form.addEventListener('submit', async ev => {
+  ev.preventDefault();
+  if (!chosen.length) { fail('Choose at least one recording first.'); return; }
+
+  err.style.display = 'none';
+  go.disabled = true;
+  msg.textContent = 'Uploading ' + plural(chosen.length, 'file') + '…';
+
+  const fd = new FormData();
+  for (const f of chosen) fd.append('files', f, f.name);
+
+  try {
+    const r = await fetch('/upload', { method: 'POST', body: fd });
+    if (r.status === 401) { location.href = '/login'; return; }
+    const j = await r.json().catch(() => ({ error: 'Server returned ' + r.status }));
+    if (!r.ok) { fail(j.error || ('Upload failed: ' + r.status)); return; }
+    msg.textContent = 'Queued ' + plural(j.total, 'recording') + '…';
+    location.href = '/jobs/' + j.job;
+  } catch (ex) { fail('Upload failed: ' + ex.message); }
+});
+
+function fail(text) {
+  err.innerHTML = '<span class="dot critical"></span><span>' + escapeHtml(text) + '</span>';
+  err.style.display = 'flex';
+  msg.textContent = '';
+  go.disabled = false;
+  go.textContent = label(chosen);
+}
+</script>
+{% endblock %}

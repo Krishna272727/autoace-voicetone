@@ -1,0 +1,26 @@
+# Build context hygiene. Without this the whole 1.3 GB virtualenv is uploaded
+# to the builder on every build, and then thrown away, because the image
+# installs its own dependencies from requirements.txt.
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+
+# Model caches: the image downloads its own at build time into /app/.hf_cache.
+# A host cache copied in would be the wrong revisions and a duplicate layer.
+.hf_cache/
+.cache/
+
+# Generated, and regenerable. 20 MB of WAVs that only the tuner reads.
+synthetic/
+results/
+
+.git/
+.github/
+.vscode/
+*.log
+.DS_Store
+.env

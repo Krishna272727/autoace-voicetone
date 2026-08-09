@@ -1,0 +1,33 @@
+{# One row in an upload list. Shared by the home-page preview and /history so
+   the two can never drift apart. Expects `b`.
+
+   The name of the thing uploaded leads. It used to read "3 recordings", which
+   is true of most rows and therefore tells you nothing about which upload you
+   are looking at; the count moved to the second line where it belongs. #}
+<a class="batch" href="/jobs/{{ b.id }}">
+  <span class="dot {{ 'good' if b.status == 'done' and not b.n_failed
+                      else 'critical' if b.status == 'error' or b.n_failed
+                      else 'warning' }}{{ ' pulse' if b.running else '' }}"></span>
+  <span class="batch-main">
+    <span class="batch-title" title="{{ b.title }}">{{ b.title }}</span>
+    <span class="batch-sub">
+      {%- if b.running %}
+        Analysing {{ b.total }} recording{{ '' if b.total == 1 else 's' }}
+        &middot; {{ b.percent }}%
+      {%- elif b.status == 'error' %}
+        Could not run
+      {%- else %}
+        {{ b.n_ok }} recording{{ '' if b.n_ok == 1 else 's' }} analysed
+        {%- if b.n_failed %} &middot; {{ b.n_failed }} could not be read{% endif %}
+      {%- endif -%}
+    </span>
+  </span>
+  <span class="batch-when">
+    {%- set a = b.age_s -%}
+    {% if a < 60 %}just now
+    {%- elif a < 3600 %}{{ (a / 60) | int }} min ago
+    {%- elif a < 86400 %}{{ (a / 3600) | int }} h ago
+    {%- else %}{{ (a / 86400) | int }} d ago{% endif -%}
+  </span>
+  <span class="batch-go" aria-hidden="true">&rsaquo;</span>
+</a>

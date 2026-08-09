@@ -1,0 +1,64 @@
+# All decision boundaries for the system live here. derive.py loads this file;
+# no threshold is hardcoded anywhere else.
+#
+# Values are anchored to measurements on the three provided calls and then
+# re-tuned on the synthetic corpus (scripts/tune_thresholds.py, BUILD_SPEC 10).
+# The three real calls are a sanity check AFTER tuning, never a tuning target.
+
+noise:
+  # Noise floor in dB relative to speech, from minimum-statistics estimation
+  # (see predictors/noise.py for why the gap-only estimator was rejected).
+  # Measured on the provided calls:
+  #   call_001  -57.9  labelled: no noise
+  #   call_003  -47.7  labelled: medium ("sharp static")
+  #   call_002  -32.8  labelled: medium ("TV")
+  # present_db sits midway between the no-noise file and the quieter noisy one.
+  # NOTE the 15 dB spread *within* the single "medium" label: two anchors cannot
+  # define four bands, so low_db and high_db are placed to keep both medium
+  # files in `medium` and are explicitly provisional until the synthetic SNR
+  # sweep (BUILD_SPEC 8) sets them properly. Do not read them as fitted values.
+  #
+  # NOT tuned on the synthetic corpus, deliberately. The tuner moved
+  # present_db to -26 dB and the three real calls' agreement fell to 66.7%.
+  # The cause is a corpus construction fault, not a detector fault: the
+  # synthetic clips are built on top of the *provided calls*, which already
+  # contain a television and line static, so a clip labelled "none" by
+  # construction genuinely has audible noise in it. The detector is right and
+  # the label is wrong, and fitting to it would break the real files.
+  # Rebuilding the corpus from clean speech is the fix; see MEMO.md.
+  present_db: -53.0
+  low_db: -53.0
+  medium_db: -50.0
+  high_db: -24.0
+  type_min_score: 0.15
+
+quality:
+  # degradation_score in [0,1]; 0 pristine, 1 unusable.
+  slight: 0.25
+  severe: 0.55
+
+silence:
+  # TUNED on the synthetic corpus, 4-fold grouped CV: macro F1 0.812 -> 1.000.
+  # Inserted gaps of 3/6/9/14/22 s with ground truth "gap >= 10 s" make any
+  # boundary in (9, 14) perfect; 12.0 is the midpoint and therefore the most
+  # robust choice, where the original 10.0 sat exactly on a class boundary.
+  # Still comfortably above call_003's 7.3 s conversational pause, which is
+  # labelled false. Conversational pauses are not dead air.
+  long_silence_s: 12.0
+
+overlap:
+  ratio_min: 0.02
+
+emotion:
+  arousal_low: 0.20
+  arousal_high: 0.55
+  valence_neutral_band: 0.20
+  valence_upset: -0.45
+  distress_arousal: 0.80
+  distress_valence: -0.60
+
+confidence:
+  base: 0.85
+  missing_penalty: 0.09
+  role_weight: 0.20
+  floor: 0.10
