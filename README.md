@@ -2,7 +2,7 @@
 
 Upload call recordings, get nine structured fields back per call.
 
-**https://autoace-868989752147.us-central1.run.app** — sign in with `demo` / `demo123`
+**https://autoace-868989752147.us-central1.run.app**
 
 Drop in individual files or a ZIP; nested folders are searched. Results are
 sortable, every clip can be played back in the browser to check a prediction by
