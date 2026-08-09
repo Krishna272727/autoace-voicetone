@@ -33,3 +33,6 @@ BUILD_SPEC.md
 # recordings and their brief. Kept locally, never committed.
 samples/
 docs/
+
+# AutoAce's label template, identical to samples/labels.csv.
+Output format.csv
