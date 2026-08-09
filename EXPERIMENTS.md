@@ -8,6 +8,10 @@ chased back up (BUILD_SPEC.md 3.4).
 .venv/bin/python cli.py samples/ --labels samples/labels.csv --out results
 ```
 
+`samples/` holds AutoAce's three production calls and is deliberately not in
+this repository; the command is recorded so the runs below can be reproduced
+against the same input.
+
 **The three sample calls are sanity anchors, not targets.** n=3, one annotator,
 and roughly half the output space has no example at all. A system scoring 100%
 here would be a system fitted to three files.
