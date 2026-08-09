@@ -24,11 +24,6 @@ ear, and the whole batch downloads as CSV or JSON.
 }
 ```
 
-## Results
-
-**83.3% mean field accuracy** on the three provided calls, against a 45.8%
-majority-class baseline. Per-field figures, confusion pairs and the four
-disagreements are in `MEMO.md`.
 
 Predictions for the three calls are in `Output format.csv`.
 
