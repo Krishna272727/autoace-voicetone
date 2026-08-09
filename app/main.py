@@ -55,15 +55,30 @@ def _warm_models() -> None:
     that health-checks the port before routing traffic must not wait for this.
     """
     import time
-    t = time.perf_counter()
-    try:
-        from voicetone.stack import build_predictors
-        build_predictors()
-        log.info("model warm-up finished in %.1fs", time.perf_counter() - t)
-    except Exception as exc:                       # noqa: BLE001
-        # Never fatal: a missing checkpoint should degrade the stack, not stop
-        # the dashboard from serving.
-        log.warning("model warm-up failed (%s); models will load on demand", exc)
+
+    from voicetone import models
+
+    # Call the loaders, not build_predictors(). The predictors hold no model
+    # state -- they call these lru_cached functions on first use -- so building
+    # the stack constructs a few objects and loads nothing. A first attempt did
+    # exactly that and "warmed up" in 2.9 s, which was the tell: the
+    # checkpoints are 2 GB and cannot be read that fast.
+    loaders = [("vad", models.vad_session), ("tagger", models.audioset_tagger),
+               ("ser", models.ser_model), ("speaker", models.speaker_embedder),
+               ("text", models.text_sentiment), ("asr", models.asr_model)]
+
+    total = time.perf_counter()
+    for name, load in loaders:
+        t = time.perf_counter()
+        try:
+            load()
+            log.info("warm %-8s %5.1fs", name, time.perf_counter() - t)
+        except Exception as exc:                   # noqa: BLE001
+            # Never fatal, and never abandon the rest: one unavailable
+            # checkpoint should degrade that field, not leave the other five
+            # cold and the dashboard slow.
+            log.warning("warm %-8s failed (%s)", name, exc)
+    log.info("model warm-up finished in %.1fs", time.perf_counter() - total)
 
 
 @asynccontextmanager
