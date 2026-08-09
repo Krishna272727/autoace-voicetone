@@ -1,0 +1,178 @@
+{# ---------------------------------------------------------------------------
+   Something to do while a batch runs.
+
+   An endless runner in the dead space of the progress card. Analysis takes a
+   couple of minutes on a long call and there is nothing to look at; a progress
+   bar does not need watching, and staring at one makes the wait feel longer
+   than it is.
+
+   Plain canvas, no dependencies, ~4 KB. It starts paused so nothing moves
+   until someone chooses to play, stops when the tab is hidden, and disappears
+   with the progress card the moment results arrive.
+--------------------------------------------------------------------------- #}
+<div class="runner" id="runner">
+  <canvas id="runnerCanvas" aria-label="A small game to pass the time"
+          role="img"></canvas>
+  <div class="runner-hint" id="runnerHint">
+    <b>Press space</b> or click to jump
+  </div>
+</div>
+
+<style>
+  .runner {
+    position: relative; margin-top: 16px; border-radius: var(--radius-sm);
+    border: 1px solid var(--line); background: var(--surface-2);
+    overflow: hidden; cursor: pointer; user-select: none;
+  }
+  .runner canvas { display: block; width: 100%; height: 132px; }
+  .runner-hint {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    font-size: 13px; color: var(--ink-3); pointer-events: none;
+    background: color-mix(in srgb, var(--surface-2) 72%, transparent);
+    transition: opacity .2s;
+  }
+  .runner-hint b { color: var(--ink); font-weight: 620; }
+  .runner-hint.gone { opacity: 0; }
+</style>
+
+<script>
+(() => {
+  const wrap = document.getElementById('runner');
+  const cv   = document.getElementById('runnerCanvas');
+  const hint = document.getElementById('runnerHint');
+  if (!wrap || !cv) return;
+  const ctx = cv.getContext('2d');
+
+  const css = getComputedStyle(document.documentElement);
+  const col = n => css.getPropertyValue(n).trim() || '#888';
+  const INK = col('--ink-3'), BRAND = col('--brand-light'), LINE = col('--line-2');
+  const OBST = col('--ink-2');   // obstacles need to read against the panel
+
+  // Peak height is JUMP^2 / 2G. At -10.4 that was 87px in a 132px canvas and
+  // the runner left the top of the frame; -8.4 peaks at ~57px, comfortably
+  // over a 30px obstacle without looking like a moon landing.
+  const H = 132, GROUND = H - 26, G = 0.62, JUMP = -8.4;
+  let W = 600, dpr = 1;
+
+  function size() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = wrap.clientWidth;
+    cv.width = W * dpr; cv.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  size();
+  addEventListener('resize', size);
+
+  let y = 0, vy = 0, run = false, dead = false, t = 0, score = 0, speed = 4.4;
+  let obstacles = [], hills = [];
+  let best = +(localStorage.getItem('autoace.runner.best') || 0);
+
+  function reset() {
+    y = 0; vy = 0; dead = false; t = 0; score = 0; speed = 4.4;
+    obstacles = []; hills = [];
+    for (let i = 0; i < 4; i++) hills.push({ x: i * 190 + 120, h: 8 + (i * 37) % 22 });
+  }
+  reset();
+
+  function jump() {
+    if (dead) { reset(); run = true; return; }
+    if (!run) { run = true; hint.classList.add('gone'); return; }
+    if (y === 0) vy = JUMP;                    // no double jump
+  }
+
+  wrap.addEventListener('pointerdown', jump);
+  addEventListener('keydown', e => {
+    if (e.code !== 'Space' && e.code !== 'ArrowUp') return;
+    // Space scrolls the page by default, which is precisely the wrong thing
+    // when someone is using it as a jump button.
+    if (document.body.contains(wrap)) { e.preventDefault(); jump(); }
+  });
+
+  function dino(x, gy) {
+    ctx.fillStyle = BRAND;
+    const b = gy - 22;
+    ctx.fillRect(x + 8, b, 14, 11);            // body
+    ctx.fillRect(x + 18, b - 8, 10, 9);        // head
+    ctx.fillRect(x + 26, b - 5, 4, 2);         // snout
+    ctx.fillRect(x, b + 2, 9, 4);              // tail
+    if (y < 0) {                               // airborne: legs tucked
+      ctx.fillRect(x + 10, b + 11, 4, 5);
+      ctx.fillRect(x + 16, b + 11, 4, 5);
+    } else {                                   // running cycle
+      const f = Math.floor(t / 6) % 2;
+      ctx.fillRect(x + 10, b + 11, 4, f ? 7 : 4);
+      ctx.fillRect(x + 16, b + 11, 4, f ? 4 : 7);
+    }
+  }
+
+  function frame() {
+    requestAnimationFrame(frame);
+    ctx.clearRect(0, 0, W, H);
+
+    // ground
+    ctx.strokeStyle = LINE; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, GROUND + .5); ctx.lineTo(W, GROUND + .5); ctx.stroke();
+
+    // parallax hills, drawn whether or not the game is running so the panel
+    // never looks broken before the first click
+    ctx.fillStyle = LINE;
+    for (const h of hills) {
+      if (run && !dead) h.x -= speed * 0.28;
+      if (h.x < -80) { h.x += 4 * 190; h.h = 8 + Math.floor(Math.random() * 22); }
+      ctx.beginPath();
+      ctx.moveTo(h.x, GROUND); ctx.lineTo(h.x + 30, GROUND - h.h);
+      ctx.lineTo(h.x + 60, GROUND); ctx.closePath(); ctx.fill();
+    }
+
+    if (run && !dead) {
+      t++;
+      speed = 4.4 + Math.min(t / 900, 4);
+      vy += G; y = Math.min(0, y + vy);
+      if (y === 0) vy = 0;
+
+      const last = obstacles[obstacles.length - 1];
+      if (!last || W - last.x > 210 + Math.random() * 190) {
+        const tall = Math.random() < 0.35;
+        obstacles.push({ x: W + 20, w: tall ? 11 : 16, h: tall ? 30 : 20 });
+      }
+      for (const o of obstacles) o.x -= speed;
+      obstacles = obstacles.filter(o => o.x + o.w > -10);
+
+      const dx = 20, dw = 26, dh = 30;         // the runner's collision box
+      for (const o of obstacles) {
+        if (dx + dw > o.x + 3 && dx < o.x + o.w - 3 &&
+            GROUND + y > GROUND - o.h + 4) {
+          dead = true;
+          best = Math.max(best, Math.floor(score));
+          localStorage.setItem('autoace.runner.best', best);
+        }
+      }
+      score += 0.18;
+    }
+
+    ctx.fillStyle = OBST;
+    for (const o of obstacles) ctx.fillRect(o.x, GROUND - o.h, o.w, o.h);
+    dino(20, GROUND + y);
+
+    ctx.fillStyle = INK;
+    ctx.font = '600 12px ui-monospace, SFMono-Regular, Menlo, monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(String(Math.floor(score)).padStart(5, '0'), W - 12, 20);
+    if (best) { ctx.globalAlpha = .55;
+                ctx.fillText('HI ' + String(best).padStart(5, '0'), W - 72, 20);
+                ctx.globalAlpha = 1; }
+
+    if (dead) {
+      ctx.textAlign = 'center';
+      ctx.font = '650 13px ' + css.getPropertyValue('--sans');
+      ctx.fillText('Click to play again', W / 2, GROUND - 34);
+    }
+  }
+  requestAnimationFrame(frame);
+
+  // A background tab should not spend CPU that the analysis wants.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) run = false;
+  });
+})();
+</script>
