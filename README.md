@@ -25,7 +25,9 @@ ear, and the whole batch downloads as CSV or JSON.
 ```
 
 
-Predictions for the three calls are in `Output format.csv`.
+Predictions for the three provided calls are in `predictions.csv`,
+in the schema AutoAce supplied. (`Output format.csv` is AutoAce's own
+template, kept for reference.)
 
 ## Reading further
 
