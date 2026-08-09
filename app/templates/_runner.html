@@ -10,17 +10,27 @@
    until someone chooses to play, stops when the tab is hidden, and disappears
    with the progress card the moment results arrive.
 --------------------------------------------------------------------------- #}
+<div class="runner-head">
+  <span>Nothing to watch here. Have a game while we work.</span>
+  <span class="runner-best" id="runnerBest"></span>
+</div>
 <div class="runner" id="runner">
   <canvas id="runnerCanvas" aria-label="A small game to pass the time"
           role="img"></canvas>
   <div class="runner-hint" id="runnerHint">
-    <b>Press space</b> or click to jump
+    <span><b>Click</b> or press <b>space</b> to jump</span>
   </div>
 </div>
 
 <style>
+  .runner-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; margin: 18px 0 7px;
+    font-size: 12px; color: var(--ink-4);
+  }
+  .runner-best { font-family: var(--mono); font-size: 11px; }
   .runner {
-    position: relative; margin-top: 16px; border-radius: var(--radius-sm);
+    position: relative; border-radius: var(--radius-sm);
     border: 1px solid var(--line); background: var(--surface-2);
     overflow: hidden; cursor: pointer; user-select: none;
   }
@@ -32,6 +42,10 @@
     transition: opacity .2s;
   }
   .runner-hint b { color: var(--ink); font-weight: 620; }
+  .runner-hint span {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 99px; padding: 7px 16px; box-shadow: var(--shadow-sm);
+  }
   .runner-hint.gone { opacity: 0; }
 </style>
 
@@ -66,6 +80,12 @@
   let y = 0, vy = 0, run = false, dead = false, t = 0, score = 0, speed = 4.4;
   let obstacles = [], hills = [];
   let best = +(localStorage.getItem('autoace.runner.best') || 0);
+  const bestEl = document.getElementById('runnerBest');
+  const showBest = () => {
+    const txt = best ? 'best ' + String(best).padStart(5, '0') : '';
+    if (bestEl && bestEl.textContent !== txt) bestEl.textContent = txt;
+  };
+  showBest();
 
   function reset() {
     y = 0; vy = 0; dead = false; t = 0; score = 0; speed = 4.4;
@@ -158,9 +178,7 @@
     ctx.font = '600 12px ui-monospace, SFMono-Regular, Menlo, monospace';
     ctx.textAlign = 'right';
     ctx.fillText(String(Math.floor(score)).padStart(5, '0'), W - 12, 20);
-    if (best) { ctx.globalAlpha = .55;
-                ctx.fillText('HI ' + String(best).padStart(5, '0'), W - 72, 20);
-                ctx.globalAlpha = 1; }
+    showBest();
 
     if (dead) {
       ctx.textAlign = 'center';
