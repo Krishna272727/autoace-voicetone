@@ -215,10 +215,20 @@ Run charges about $0.086 per vCPU-hour against roughly $0.01 on a plain VM, a
 because it is a continuously-fed batch queue rather than bursty traffic.
 
 Cloud Run was chosen for the evaluation deployment on availability grounds, not
-cost: it builds remotely, holds a warm instance through the evaluation window,
+cost: it builds remotely, held a warm instance through the evaluation window,
 and needed no VM administration. The production recommendation is a plain
 always-on instance, which is what the $0.000144 figure above prices and what
 the ceiling comfortably permits.
+
+**After evaluation the deployment was moved to `--min-instances 0`,** which
+changes the bill but not the rate. The per-audio-minute figures above are
+unchanged — they price an instance that is up and working — but idle time is no
+longer billed at all, so an unvisited month costs nothing instead of $550. What
+that trades away is a cold start on the first request after roughly fifteen
+minutes of quiet, and the guarantee that a job survives a client which uploads
+and then closes the tab. Both were worth paying for while a reviewer might
+arrive at any moment; neither is worth $550 a month afterwards. `DEPLOY.md`
+records the mechanism and the residual risk.
 
 Stated plainly because the difference is 40x: **the hosted demo costs about
 $0.006 per audio-minute; the production approach costs about $0.00014.** The
