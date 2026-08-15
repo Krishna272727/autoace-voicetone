@@ -47,6 +47,23 @@ COPY cli.py ./
 RUN python scripts/download_models.py \
     && python scripts/download_models.py --prune
 
+# Prove the claim in the header rather than assuming it. With the hub forced
+# offline, loading every checkpoint either succeeds from the baked cache or
+# fails the build here -- it cannot quietly fall back to the network.
+#
+# This exists because it did quietly fall back. A per-repo prune removed the
+# only weights on `main` for the sentiment checkpoint, and transformers
+# re-resolved it from an unmerged pull request on huggingface.co at every cold
+# start: ~10 s of warm-up, and outbound requests LICENCES.md says do not happen.
+# Nothing caught it, because the fallback logs as success.
+RUN HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 python scripts/download_models.py
+
+# Runtime is offline too. The cache is complete by construction above, so this
+# is belt-and-braces: any future gap fails loudly at startup instead of turning
+# into a silent dependency on a third party.
+ENV HF_HUB_OFFLINE=1 \
+    TRANSFORMERS_OFFLINE=1
+
 # Application code last: a change here rebuilds only the layers below.
 COPY app/ ./app/
 

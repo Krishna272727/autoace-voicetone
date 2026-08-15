@@ -31,31 +31,43 @@ def prune_duplicate_weights(dry_run: bool = False) -> int:
     sentiment, speaker and SER checkpoints. Nothing loads the `.bin` once the
     safetensors file is present, so it is 1.2 GB of image for no behaviour.
 
-    The two formats usually sit in DIFFERENT revisions of the same repo, not in
-    one snapshot directory: several of these repos publish only `.bin` on
-    `main`, and transformers then follows the safetensors-conversion bot's pull
-    request. So the match has to be per repo, not per snapshot.
+    The match is per SNAPSHOT, and that is the whole correctness argument.
+
+    An earlier version matched per repo: if any revision held a safetensors
+    file, the `.bin` was pruned from every revision. That is wrong, and it was
+    wrong in production. The two formats usually sit in different revisions --
+    several of these repos publish only `.bin` on `main`, and transformers
+    follows the safetensors-conversion bot's pull request to find the other.
+    Pruning per repo therefore deletes the only weights `main` has, leaving a
+    cache that cannot resolve `main` offline at all.
+
+    Transformers does not fail when that happens. It goes to the network,
+    re-resolves the PR revision, and loads successfully -- so the container
+    silently acquires a runtime dependency on huggingface.co, and on an
+    unmerged pull request in someone else's repo. Measured on the deployed
+    service: ~10 s of the 60 s warm-up, and a set of outbound requests that
+    LICENCES.md states do not happen.
+
+    Matching per snapshot prunes less (only where both formats are genuinely
+    duplicated in one revision) and can never remove a revision's last weights.
+    The build verifies this rather than assuming it -- see the offline load in
+    the Dockerfile, which fails the build if any checkpoint needs the network.
 
     Deletes the blob, not just the symlink -- the cache stores content in
     `blobs/` and snapshots are links into it, so unlinking the visible name
     frees nothing.
-
-    Off by default, and worth knowing why: this assumes transformers will keep
-    choosing the safetensors revision. If a repo later removes it, the pruned
-    cache can no longer load offline and the image must be rebuilt.
     """
     import os
 
     hf = Path(os.getenv("HF_HOME", Path.home() / ".cache" / "huggingface"))
     freed = 0
     for repo in sorted((hf / "hub").glob("models--*")):
-        snaps = list(repo.glob("snapshots/*"))
-        if not any((s / "model.safetensors").exists() for s in snaps):
-            continue                      # only .bin available; it is load-bearing
-        for s in snaps:
+        for s in sorted(repo.glob("snapshots/*")):
             bin_ = s / "pytorch_model.bin"
             if not bin_.exists():
                 continue
+            if not (s / "model.safetensors").exists():
+                continue          # this revision's only weights; load-bearing
             blob = bin_.resolve()
             size = blob.stat().st_size if blob.is_file() else 0
             freed += size
