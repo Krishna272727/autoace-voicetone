@@ -5,7 +5,7 @@
 ```bash
 gcloud run deploy autoace --source . --region us-central1 \
   --memory 8Gi --cpu 8 --no-cpu-throttling --cpu-boost \
-  --min-instances 1 --max-instances 1 \
+  --min-instances 0 --max-instances 1 \
   --timeout 3600 --concurrency 20 --allow-unauthenticated \
   --set-env-vars "DASHBOARD_USER=...,BATCH_WORKERS=2,OMP_NUM_THREADS=4,TORCH_THREADS=4,COOKIE_SECURE=1" \
   --set-secrets "DASHBOARD_PASS=autoace-pass:latest,SESSION_SECRET=autoace-session:latest"
@@ -23,8 +23,28 @@ status polls.
 would 404 status polls for jobs it never saw. This is the same property that
 rules out serverless functions entirely; Cloud Run just lets you pin it.
 
-**`--min-instances 1`.** With scale-to-zero there is no process to run the
-background pool between requests.
+**`--min-instances 0`.** This started at 1, on the reasoning that scale-to-zero
+leaves no process to run the background pool between requests. That is true only
+if the instance is reclaimed mid-job, and it usually is not: the browser polls
+`/jobs/{id}/status` throughout, and those polls are in-flight requests that hold
+the instance up. Combined with `--no-cpu-throttling`, which allocates CPU for
+the instance's whole lifetime rather than per request, a job started by a client
+that stays on the page runs at full 8 vCPU and then the instance goes away.
+
+The residual risk is real and accepted: upload, close the tab, and polling stops,
+so the instance can be reclaimed with the job unfinished. That was not acceptable
+during evaluation, which is why it was pinned to 1 then.
+
+The cost difference is the entire point. Always-allocated CPU at
+`--min-instances 1` bills whether or not anyone visits — $550/month at 8 vCPU.
+At 0 an idle month is $0, and a session costs the processing time plus the
+~15-minute idle tail before Cloud Run scales down, or roughly $0.21. The tail is
+not a documented guarantee, and it is also what lets a second visitor inside the
+window skip the cold start.
+
+`app/templates/index.html` carries a notice about the resulting first-run
+warm-up, because an unexplained minute reads as a slow system rather than a
+loading one.
 
 **`--cpu-boost`.** Extra CPU during startup, which is when the models load.
 
@@ -42,8 +62,13 @@ running cost:
 | 4 vCPU + 8 GiB | $300 |
 | 8 vCPU + 8 GiB | $550 |
 
-Measured warm throughput: **RTF 0.47 at 8 vCPU, 1.88 at 2 vCPU**. Scale up for
-an evaluation window, then `--min-instances 0` to drop the cost to near zero.
+Measured warm throughput: **RTF 0.47 at 8 vCPU, 1.88 at 2 vCPU**.
+
+Those figures apply while an instance is up. With `--min-instances 0` the table
+is the *rate*, not the bill: the service now costs nothing when idle and 8 vCPU
+only while someone is using it, which is why the instance is left at 8 rather
+than being cut to save money. Scaling down would trade the latency for a saving
+that scale-to-zero already delivers.
 
 ### Two things that cost hours, recorded so they do not again
 

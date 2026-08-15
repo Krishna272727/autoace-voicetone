@@ -141,6 +141,17 @@
 </div>
 {% endif %}
 
+{# The deployment scales to zero when idle, so the first upload after a quiet
+   spell waits on model load. Stated up front and framed as what it is -- a
+   warm-up -- because an unexplained 60 s on the first run reads as "slow
+   system" rather than "loading". See DEPLOY.md. #}
+<div class="notice info">
+  <span class="dot good"></span>
+  <span><b>First run warms up.</b> The models load into memory on the first
+    analysis after a quiet period, so that one takes about a minute longer.
+    Every run after it is at full speed.</span>
+</div>
+
 <div class="card">
   <form id="f">
     <div class="drop" id="drop">
