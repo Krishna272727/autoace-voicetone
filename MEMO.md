@@ -189,6 +189,43 @@ ceiling                                        $0.003
 headroom                                       ~21x
 ```
 
+### The evaluation host is not the costed host, and the gap is large
+
+The arithmetic above prices a commodity VM. The dashboard AutoAce is logging
+into runs on Cloud Run, which is materially more expensive, and the two numbers
+should not be conflated.
+
+Cloud Run bills CPU and memory by the second with CPU always allocated
+(required here: analysis runs in a background thread pool, and with the default
+request-scoped CPU a job simply stalls once the upload response is sent). At
+us-central1 list price, $0.000024 per vCPU-second and $0.0000025 per GiB-second:
+
+| configuration | $/hour | RTF | $/audio-min | vs $0.003 |
+|---|---|---|---|---|
+| Cloud Run 8 vCPU / 8 GiB | 0.763 | 0.47 | **0.00598** | 2.0x over |
+| Cloud Run 4 vCPU / 8 GiB | 0.418 | 0.77 | **0.00536** | 1.8x over |
+| Cloud Run 2 vCPU / 8 GiB | 0.245 | 1.88 | **0.00767** | 2.6x over |
+| commodity VM 2 vCPU / 4 GB | 0.020 | 0.43 | 0.00014 | 21x headroom |
+
+**No Cloud Run configuration meets the ceiling for this workload.** Faster
+instances finish sooner but not proportionally sooner, so the product of rate
+and time stays roughly flat at 2x over. The cause is not the pipeline: Cloud
+Run charges about $0.086 per vCPU-hour against roughly $0.01 on a plain VM, a
+9x premium for scale-to-zero and managed TLS that this workload does not need,
+because it is a continuously-fed batch queue rather than bursty traffic.
+
+Cloud Run was chosen for the evaluation deployment on availability grounds, not
+cost: it builds remotely, holds a warm instance through the evaluation window,
+and needed no VM administration. The production recommendation is a plain
+always-on instance, which is what the $0.000144 figure above prices and what
+the ceiling comfortably permits.
+
+Stated plainly because the difference is 40x: **the hosted demo costs about
+$0.006 per audio-minute; the production approach costs about $0.00014.** The
+brief constrains the final production approach, and that is the number claimed
+against the ceiling. It would have been easy to quote only the favourable one.
+
+
 DSP-only, the same arithmetic gives roughly **$0.000017 per audio-minute**,
 ~175× headroom.
 
